@@ -6,6 +6,20 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
+/// On Windows, prevent a spawned subprocess from opening a console window
+/// (CREATE_NO_WINDOW = 0x0800_0000). No-op on other platforms.
+fn hide_console(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = cmd; // avoid unused-parameter warning
+    }
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Clone)]
@@ -162,11 +176,12 @@ impl Default for FfmpegState {
 /// Run `ffmpeg -hide_banner -encoders` and inspect the output for known HW
 /// encoder names. Returns an all-false `HwSupport` if ffmpeg fails to launch.
 pub fn probe_hw_support(ffmpeg_path: &Path) -> HwSupport {
-    let out = Command::new(ffmpeg_path)
-        .args(["-hide_banner", "-encoders"])
+    let mut cmd = Command::new(ffmpeg_path);
+    cmd.args(["-hide_banner", "-encoders"])
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output();
+        .stderr(Stdio::null());
+    hide_console(&mut cmd);
+    let out = cmd.output();
 
     let Ok(out) = out else { return HwSupport::default() };
     let text = String::from_utf8_lossy(&out.stdout);
@@ -457,10 +472,12 @@ fn run_ffmpeg_with_progress(
     total_segs: usize,
     app: &AppHandle,
 ) -> Result<(), String> {
-    let mut child = Command::new(ffmpeg)
-        .args(args)
+    let mut cmd = Command::new(ffmpeg);
+    cmd.args(args)
         .stderr(Stdio::piped())
-        .stdout(Stdio::null())
+        .stdout(Stdio::null());
+    hide_console(&mut cmd);
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn ffmpeg: {e}"))?;
 
@@ -549,7 +566,7 @@ fn run_export(
                         .to_string(),
                 );
             }
-            (Codec::H264 | Codec::H265) if lo == ".webm" => {
+            Codec::H264 | Codec::H265 if lo == ".webm" => {
                 return Err(
                     "WebM only supports VP9 video. \
                      Choose MKV or MP4 as the format, or switch the codec to VP9."
