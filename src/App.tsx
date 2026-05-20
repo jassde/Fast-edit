@@ -2,18 +2,18 @@ import './App.css'
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 
 import { useAppState } from './hooks/useAppState'
 import { useMpv } from './hooks/useMpv'
 import { useFileDrop } from './hooks/useFileDrop'
 import { useKeyboard } from './hooks/useKeyboard'
-import { HwSupport, ContextMenuScope, ContextMenuStatus } from './types'
+import { HwSupport } from './types'
 
 import { PlaybackControls } from './components/PlaybackControls'
 import { Timeline } from './components/Timeline'
 import { ExportModal } from './components/ExportModal'
 import { SettingsModal } from './components/SettingsModal'
+import { ScrollSettingsPanel } from './components/ScrollSettingsPanel'
 
 const NO_HW_SUPPORT: HwSupport = { nvenc: false, qsv: false, amf: false }
 
@@ -30,63 +30,6 @@ export default function App() {
       .then(setHwSupport)
       .catch(() => { /* fall back to NO_HW_SUPPORT — Auto + Software remain selectable */ })
   }, [])
-
-  // Initial-launch file (Explorer "Edit with..." on a closed app) + subsequent
-  // launches routed through the single-instance plugin's "launch-file" event.
-  // The `aborted` flag handles the unmount-before-subscribe race: if listen()
-  // resolves after cleanup, we immediately invoke the unsubscribe instead of
-  // leaking the subscription. Same pattern used in ExportModal.tsx.
-  useEffect(() => {
-    let aborted = false
-    let unlisten: (() => void) | null = null
-
-    invoke<string | null>('take_launch_file')
-      .then(path => { if (path && !aborted) actions.setFilePath(path) })
-      .catch(() => { /* command unavailable — ignore */ })
-
-    listen<string>('launch-file', e => {
-      if (e.payload) actions.setFilePath(e.payload)
-    }).then(fn => {
-      if (aborted) fn()
-      else unlisten = fn
-    })
-
-    return () => {
-      aborted = true
-      unlisten?.()
-    }
-  }, [actions])
-
-  // Context-menu registration state for the Settings modal toggles, separate
-  // booleans for each scope. `null` = still loading (buttons disabled).
-  // Refresh after each toggle so the labels flip to match reality.
-  const [contextMenuStatus, setContextMenuStatus] = useState<ContextMenuStatus | null>(null)
-
-  const refreshContextMenuStatus = useCallback(() => {
-    invoke<ContextMenuStatus>('context_menu_status')
-      .then(setContextMenuStatus)
-      .catch(() => setContextMenuStatus(null))
-  }, [])
-
-  useEffect(() => { refreshContextMenuStatus() }, [refreshContextMenuStatus])
-
-  const toggleContextMenuScope = useCallback(async (scope: ContextMenuScope) => {
-    const isRegistered = scope === 'user'
-      ? contextMenuStatus?.user
-      : contextMenuStatus?.machine
-    try {
-      if (isRegistered) {
-        await invoke('unregister_context_menu', { scope })
-      } else {
-        await invoke('register_context_menu', { scope })
-      }
-    } catch (e) {
-      // The most common failure mode is "Elevation was canceled." for the
-      // machine scope when the user dismisses the UAC prompt — log and refresh.
-      console.error(`Context menu ${scope} toggle failed:`, e)
-    }
-    refreshContextMenuStatus()
-  }, [contextMenuStatus, refreshContextMenuStatus])
 
   // mpv backend hook — pass the ref object, not .current, so useMpv reads the
   // live DOM element after mount (videoPanelRef.current is null on first render).
@@ -285,12 +228,23 @@ export default function App() {
           secondsPerShiftScrollTick={state.secondsPerShiftScrollTick}
           hwEncoder={state.hwEncoder}
           hwSupport={hwSupport}
-          contextMenuStatus={contextMenuStatus}
+          showScrollPanel={state.showScrollPanel}
           onChangeFrames={actions.setFramesPerScrollTick}
           onChangeSeconds={actions.setSecondsPerShiftScrollTick}
           onChangeHwEncoder={actions.setHwEncoder}
-          onToggleContextMenuScope={toggleContextMenuScope}
+          onToggleScrollPanel={actions.setShowScrollPanel}
           onClose={actions.closeSettingsModal}
+        />
+      )}
+
+      {/* ── Floating scroll-step panel (independent of the Settings modal) ── */}
+      {state.showScrollPanel && (
+        <ScrollSettingsPanel
+          framesPerScrollTick={state.framesPerScrollTick}
+          secondsPerShiftScrollTick={state.secondsPerShiftScrollTick}
+          onChangeFrames={actions.setFramesPerScrollTick}
+          onChangeSeconds={actions.setSecondsPerShiftScrollTick}
+          onClose={() => actions.setShowScrollPanel(false)}
         />
       )}
 

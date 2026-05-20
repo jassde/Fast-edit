@@ -22,6 +22,7 @@ type PersistedSettings = {
   framesPerScrollTick:       number
   secondsPerShiftScrollTick: number
   hwEncoder:                 HwEncoder
+  showScrollPanel:           boolean
 }
 
 function loadSettings(): PersistedSettings {
@@ -29,6 +30,7 @@ function loadSettings(): PersistedSettings {
     framesPerScrollTick:       DEFAULT_FRAMES_PER_SCROLL_TICK,
     secondsPerShiftScrollTick: DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK,
     hwEncoder:                 DEFAULT_HW_ENCODER,
+    showScrollPanel:           false,
   }
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
@@ -44,6 +46,7 @@ function loadSettings(): PersistedSettings {
         MIN_SECONDS_PER_SHIFT_SCROLL_TICK, MAX_SECONDS_PER_SHIFT_SCROLL_TICK,
       ),
       hwEncoder: VALID_HW_ENCODERS.has(p.hwEncoder) ? p.hwEncoder : fb.hwEncoder,
+      showScrollPanel: p.showScrollPanel === true,
     }
   } catch {
     return fb
@@ -64,6 +67,7 @@ function persistFromAppState(s: AppState) {
     framesPerScrollTick:       s.framesPerScrollTick,
     secondsPerShiftScrollTick: s.secondsPerShiftScrollTick,
     hwEncoder:                 s.hwEncoder,
+    showScrollPanel:           s.showScrollPanel,
   })
 }
 
@@ -84,6 +88,7 @@ export type AppState = {
   framesPerScrollTick: number
   secondsPerShiftScrollTick: number
   hwEncoder: HwEncoder
+  showScrollPanel: boolean
 }
 
 // ── Actions shape ─────────────────────────────────────────────────────────────
@@ -110,6 +115,7 @@ export type AppActions = {
   setFramesPerScrollTick: (n: number) => void
   setSecondsPerShiftScrollTick: (n: number) => void
   setHwEncoder: (e: HwEncoder) => void
+  setShowScrollPanel: (b: boolean) => void
   setMpvError: (msg: string | null) => void
   setExportError: (msg: string | null) => void
 }
@@ -133,6 +139,7 @@ const INITIAL_STATE: AppState = {
   framesPerScrollTick:       PERSISTED.framesPerScrollTick,
   secondsPerShiftScrollTick: PERSISTED.secondsPerShiftScrollTick,
   hwEncoder:                 PERSISTED.hwEncoder,
+  showScrollPanel:           PERSISTED.showScrollPanel,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -316,6 +323,14 @@ export function useAppState(): [AppState, AppActions] {
     })
   }, [])
 
+  const setShowScrollPanel = useCallback((b: boolean) => {
+    setState(s => {
+      const next = { ...s, showScrollPanel: b }
+      persistFromAppState(next)
+      return next
+    })
+  }, [])
+
   const actions: AppActions = useMemo(() => ({
     setFilePath,
     setDuration,
@@ -336,6 +351,7 @@ export function useAppState(): [AppState, AppActions] {
     setFramesPerScrollTick,
     setSecondsPerShiftScrollTick,
     setHwEncoder,
+    setShowScrollPanel,
     setMpvError,
     setExportError,
   }), [
@@ -344,7 +360,7 @@ export function useAppState(): [AppState, AppActions] {
     setSegmentStart, setSegmentEnd, setSelectedStart, setSelectedEnd,
     openExportModal, closeExportModal,
     openSettingsModal, closeSettingsModal,
-    setFramesPerScrollTick, setSecondsPerShiftScrollTick, setHwEncoder,
+    setFramesPerScrollTick, setSecondsPerShiftScrollTick, setHwEncoder, setShowScrollPanel,
     setMpvError, setExportError,
   ])
 

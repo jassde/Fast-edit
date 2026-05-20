@@ -28,19 +28,6 @@ export type HwSupport = {
   amf:   boolean
 }
 
-/**
- * Scope of the Explorer right-click menu integration.
- * - `user`: HKCU registration, current user only, no admin needed
- * - `machine`: HKLM registration, all users, requires UAC elevation
- */
-export type ContextMenuScope = 'user' | 'machine'
-
-/** Whether the right-click menu verb is currently registered for each scope. */
-export type ContextMenuStatus = {
-  user:    boolean
-  machine: boolean
-}
-
 export type ExportParams = {
   filePath: string
   outputDir: string

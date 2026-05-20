@@ -40,6 +40,11 @@
     ],
     "resources": [
       "lib/**/*"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    }
   }
 }

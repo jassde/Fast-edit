@@ -4,7 +4,7 @@ import {
   MIN_SECONDS_PER_SHIFT_SCROLL_TICK,
   MAX_SECONDS_PER_SHIFT_SCROLL_TICK,
 } from '../constants'
-import { HwEncoder, HwSupport, ContextMenuScope, ContextMenuStatus } from '../types'
+import { HwEncoder, HwSupport } from '../types'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -13,11 +13,11 @@ type SettingsModalProps = {
   secondsPerShiftScrollTick: number
   hwEncoder:                 HwEncoder
   hwSupport:                 HwSupport
-  contextMenuStatus:         ContextMenuStatus | null
+  showScrollPanel:           boolean
   onChangeFrames:            (n: number) => void
   onChangeSeconds:           (n: number) => void
   onChangeHwEncoder:         (e: HwEncoder) => void
-  onToggleContextMenuScope:  (scope: ContextMenuScope) => void
+  onToggleScrollPanel:       (b: boolean) => void
   onClose:                   () => void
 }
 
@@ -36,11 +36,11 @@ export function SettingsModal({
   secondsPerShiftScrollTick,
   hwEncoder,
   hwSupport,
-  contextMenuStatus,
+  showScrollPanel,
   onChangeFrames,
   onChangeSeconds,
   onChangeHwEncoder,
-  onToggleContextMenuScope,
+  onToggleScrollPanel,
   onClose,
 }: SettingsModalProps) {
   // Always offer Auto and Software; gate vendor-specific options on whether
@@ -103,6 +103,18 @@ export function SettingsModal({
           </div>
         </div>
 
+        {/* Floating scroll-step panel toggle */}
+        <div className="modal-field">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={showScrollPanel}
+              onChange={e => onToggleScrollPanel(e.target.checked)}
+            />
+            Show floating scroll-step panel while editing
+          </label>
+        </div>
+
         {/* Hardware encoder */}
         <div className="modal-field">
           <span className="modal-label">
@@ -120,39 +132,6 @@ export function SettingsModal({
           <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
             GPU encoders are 5–10× faster but produce slightly larger files at the same quality.
             Lossless always uses CPU.
-          </span>
-        </div>
-
-        {/* Explorer right-click menu integration */}
-        <div className="modal-field">
-          <span className="modal-label">Explorer right-click menu</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, alignItems: 'flex-start' }}>
-            <button
-              className="btn"
-              disabled={contextMenuStatus === null}
-              onClick={() => onToggleContextMenuScope('user')}
-            >
-              {contextMenuStatus === null
-                ? 'Loading…'
-                : contextMenuStatus.user
-                  ? 'Remove for current user'
-                  : 'Add for current user'}
-            </button>
-            <button
-              className="btn"
-              disabled={contextMenuStatus === null}
-              onClick={() => onToggleContextMenuScope('machine')}
-              title="Triggers a UAC prompt"
-            >
-              {contextMenuStatus === null
-                ? 'Loading…'
-                : contextMenuStatus.machine
-                  ? 'Remove for all users (admin)'
-                  : 'Add for all users (admin)'}
-            </button>
-          </div>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-            Adds an "Edit with Video Trimmer" entry on .mp4 / .webm / .mkv / .mov files. "All users" requires UAC elevation.
           </span>
         </div>
 
