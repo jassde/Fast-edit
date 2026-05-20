@@ -144,7 +144,7 @@ export default function App() {
   const [timelineZoom, setTimelineZoom] = useState<number>(1)
 
   // Selected segment's 1-based position in start order + total count, for the
-  // segment indicator. Same sort key as selectNextSegment so they agree.
+  // segment indicator. Same sort key as handleSelectNext so they agree.
   const { selectedSegmentNumber, segmentCount } = useMemo(() => {
     const sorted = [...state.segments].sort((a, b) => a.start - b.start)
     const idx = state.selectedSegmentId
@@ -155,6 +155,19 @@ export default function App() {
       segmentCount: sorted.length,
     }
   }, [state.segments, state.selectedSegmentId])
+
+  // Next ▸ : select the next segment in start order (wrap last→first; first
+  // when nothing selected) AND move the playhead to its start.
+  const handleSelectNext = useCallback(() => {
+    if (state.segments.length === 0) return
+    const sorted = [...state.segments].sort((a, b) => a.start - b.start)
+    const curr = state.selectedSegmentId
+      ? sorted.findIndex(seg => seg.id === state.selectedSegmentId)
+      : -1
+    const next = sorted[curr === -1 ? 0 : (curr + 1) % sorted.length]
+    actions.selectSegment(next.id)
+    handleSeek(next.start)
+  }, [state.segments, state.selectedSegmentId, actions, handleSeek])
 
   return (
     <div className="app-shell">
@@ -231,7 +244,7 @@ export default function App() {
             actions.deleteSegment(state.selectedSegmentId)
           }
         }}
-        onSelectNext={actions.selectNextSegment}
+        onSelectNext={handleSelectNext}
         zoom={timelineZoom}
         onChangeZoom={setTimelineZoom}
       />

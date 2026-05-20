@@ -97,8 +97,6 @@ export type AppActions = {
   addSegment: () => void
   deleteSegment: (id: string) => void
   selectSegment: (id: string | null) => void
-  /** Select the next segment in start order, wrapping last→first */
-  selectNextSegment: () => void
   setSegmentStart: (id: string, start: number) => void
   setSegmentEnd: (id: string, end: number) => void
   /** Set start of whichever segment is currently selected */
@@ -287,16 +285,6 @@ export function useAppState(): [AppState, AppActions] {
   const setIsPlaying        = useCallback((playing: boolean) => setState(s => ({ ...s, isPlaying: playing })), [])
   const setIsMuted          = useCallback((muted: boolean) => setState(s => ({ ...s, isMuted: muted })), [])
   const selectSegment       = useCallback((id: string | null) => setState(s => ({ ...s, selectedSegmentId: id })), [])
-
-  const selectNextSegment = useCallback(() => {
-    setState(s => {
-      if (s.segments.length === 0) return s
-      const sorted = [...s.segments].sort((a, b) => a.start - b.start)
-      const curr = sorted.findIndex(seg => seg.id === s.selectedSegmentId)
-      const next = curr === -1 ? 0 : (curr + 1) % sorted.length
-      return { ...s, selectedSegmentId: sorted[next].id }
-    })
-  }, [])
   const openExportModal     = useCallback(() => setState(s => ({ ...s, showExportModal: true })), [])
   const closeExportModal    = useCallback(() => setState(s => ({ ...s, showExportModal: false, exportError: null })), [])
   const openSettingsModal   = useCallback(() => setState(s => ({ ...s, showSettingsModal: true })), [])
@@ -337,7 +325,6 @@ export function useAppState(): [AppState, AppActions] {
     addSegment,
     deleteSegment,
     selectSegment,
-    selectNextSegment,
     setSegmentStart,
     setSegmentEnd,
     setSelectedStart,
@@ -353,7 +340,7 @@ export function useAppState(): [AppState, AppActions] {
     setExportError,
   }), [
     setFilePath, setDuration, setPlayheadPosition, setIsPlaying, setIsMuted,
-    addSegment, deleteSegment, selectSegment, selectNextSegment,
+    addSegment, deleteSegment, selectSegment,
     setSegmentStart, setSegmentEnd, setSelectedStart, setSelectedEnd,
     openExportModal, closeExportModal,
     openSettingsModal, closeSettingsModal,

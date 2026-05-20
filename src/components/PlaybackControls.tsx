@@ -55,7 +55,7 @@ export function PlaybackControls({
       {/* ── Left: segment editing ── */}
       <div className="pc-group pc-group--left">
         <button
-          className="btn btn-primary btn-icon"
+          className="btn btn-primary btn-icon btn-wide"
           disabled={!hasFile}
           onClick={onAddSegment}
           title="Add a new 5-second segment at the playhead position"
@@ -64,7 +64,7 @@ export function PlaybackControls({
           +
         </button>
         <button
-          className="btn btn-danger"
+          className="btn btn-danger btn-wide"
           disabled={!hasSelected}
           onClick={onDeleteSegment}
           title="Delete selected segment (Delete)"

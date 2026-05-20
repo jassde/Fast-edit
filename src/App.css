@@ -101,7 +101,7 @@ html, body, #root {
 
 /* ── Unified control bar (transport + segment edit/nav + zoom) ───────────── */
 .playback-controls {
-  height: 48px;
+  height: 56px;
   background: var(--bg-toolbar);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -208,6 +208,8 @@ html, body, #root {
   padding: 5px 10px;
   font-size: 15px;
 }
+
+.btn-wide { min-width: 64px; }
 
 /* Chrome-bar buttons (Open File, Settings) — quieter dark surface so they
    sit calmly on the toolbar without competing with the accent Export button. */
