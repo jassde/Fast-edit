@@ -15,11 +15,12 @@ import { AppActions } from './useAppState'
 // has been loaded), giving us narrowed types in the callback below.
 
 const OBSERVED_PROPERTIES = [
-  ['time-pos',    'double', 'none'],
-  ['duration',    'double', 'none'],
-  ['pause',       'flag'],
-  ['eof-reached', 'flag',   'none'],
-  ['mute',        'flag'],
+  ['time-pos',     'double', 'none'],
+  ['duration',     'double', 'none'],
+  ['pause',        'flag'],
+  ['eof-reached',  'flag',   'none'],
+  ['mute',         'flag'],
+  ['container-fps', 'double', 'none'],
 ] as const satisfies MpvObservableProperty[]
 
 const MPV_CONFIG: MpvConfig = {
@@ -90,6 +91,9 @@ export function useMpv(
               break
             case 'mute':
               a.setIsMuted(!!data)
+              break
+            case 'container-fps':
+              if (data && data > 0) a.setFps(data)
               break
           }
         })

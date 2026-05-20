@@ -199,6 +199,7 @@ export default function App() {
           segments={state.segments}
           selectedSegmentId={state.selectedSegmentId}
           playheadPosition={state.playheadPosition}
+          fps={state.fps}
           framesPerScrollTick={state.framesPerScrollTick}
           secondsPerShiftScrollTick={state.secondsPerShiftScrollTick}
           zoom={timelineZoom}

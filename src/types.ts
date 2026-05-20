@@ -41,15 +41,5 @@ export type ExportParams = {
   hwEncoder?: HwEncoder
 }
 
-// Panel bounds sent to Rust for child window positioning.
-export type PanelBounds = {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-// Tauri event payloads — field names must match Rust struct field names exactly.
-export type PlaybackPositionPayload = { position: number }
-export type VideoLoadedPayload      = { duration: number }
-export type ExportProgressPayload   = { percent: number }
+// Tauri event payload — field names must match the Rust struct fields exactly.
+export type ExportProgressPayload = { percent: number }

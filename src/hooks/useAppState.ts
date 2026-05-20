@@ -12,6 +12,7 @@ import {
   MAX_SECONDS_PER_SHIFT_SCROLL_TICK,
   DEFAULT_HW_ENCODER,
   SETTINGS_STORAGE_KEY,
+  DEFAULT_FPS,
 } from '../constants'
 
 const VALID_HW_ENCODERS: ReadonlySet<HwEncoder> = new Set(['none', 'auto', 'nvenc', 'qsv', 'amf'])
@@ -78,6 +79,7 @@ export type AppState = {
   selectedSegmentId: string | null
   playheadPosition: number    // seconds
   duration: number            // seconds; 0 means no file loaded
+  fps: number                 // clip frame rate; DEFAULT_FPS until mpv reports container-fps
   isPlaying: boolean
   isMuted: boolean
   filePath: string | null
@@ -96,6 +98,7 @@ export type AppState = {
 export type AppActions = {
   setFilePath: (path: string) => void
   setDuration: (d: number) => void
+  setFps: (fps: number) => void
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
   setIsMuted: (muted: boolean) => void
@@ -129,6 +132,7 @@ const INITIAL_STATE: AppState = {
   selectedSegmentId: null,
   playheadPosition: 0,
   duration: 0,
+  fps: DEFAULT_FPS,
   isPlaying: false,
   isMuted: false,
   filePath: null,
@@ -283,11 +287,13 @@ export function useAppState(): [AppState, AppActions] {
       selectedSegmentId: null,
       playheadPosition: 0,
       duration: 0,
+      fps: DEFAULT_FPS,
       isPlaying: false,
       mpvError: null,
     })), [])
 
   const setDuration         = useCallback((d: number) => setState(s => ({ ...s, duration: d })), [])
+  const setFps              = useCallback((fps: number) => setState(s => ({ ...s, fps })), [])
   const setPlayheadPosition = useCallback((pos: number) => setState(s => ({ ...s, playheadPosition: pos })), [])
   const setIsPlaying        = useCallback((playing: boolean) => setState(s => ({ ...s, isPlaying: playing })), [])
   const setIsMuted          = useCallback((muted: boolean) => setState(s => ({ ...s, isMuted: muted })), [])
@@ -334,6 +340,7 @@ export function useAppState(): [AppState, AppActions] {
   const actions: AppActions = useMemo(() => ({
     setFilePath,
     setDuration,
+    setFps,
     setPlayheadPosition,
     setIsPlaying,
     setIsMuted,
@@ -355,7 +362,7 @@ export function useAppState(): [AppState, AppActions] {
     setMpvError,
     setExportError,
   }), [
-    setFilePath, setDuration, setPlayheadPosition, setIsPlaying, setIsMuted,
+    setFilePath, setDuration, setFps, setPlayheadPosition, setIsPlaying, setIsMuted,
     addSegment, deleteSegment, selectSegment,
     setSegmentStart, setSegmentEnd, setSelectedStart, setSelectedEnd,
     openExportModal, closeExportModal,

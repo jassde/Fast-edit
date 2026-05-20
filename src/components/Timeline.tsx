@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react'
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { Segment } from '../types'
 import { clamp, pixelToTime, timeToPixel, formatTime } from '../utils'
 import { DEFAULT_FPS, MIN_SEGMENT_PX } from '../constants'
@@ -10,6 +10,8 @@ type TimelineProps = {
   segments: Segment[]
   selectedSegmentId: string | null
   playheadPosition: number
+  /** Clip frame rate, used to convert "frames per scroll tick" into a time step. */
+  fps: number
   framesPerScrollTick: number
   secondsPerShiftScrollTick: number
   /**
@@ -49,6 +51,7 @@ export function Timeline({
   segments,
   selectedSegmentId,
   playheadPosition,
+  fps,
   framesPerScrollTick,
   secondsPerShiftScrollTick,
   zoom,
@@ -156,8 +159,10 @@ export function Timeline({
   // the user adjusts a slider — same pattern as playheadRef above.
   const framesRef  = useRef(framesPerScrollTick)
   const secondsRef = useRef(secondsPerShiftScrollTick)
+  const fpsRef     = useRef(fps)
   framesRef.current  = framesPerScrollTick
   secondsRef.current = secondsPerShiftScrollTick
+  fpsRef.current     = fps
 
   useEffect(() => {
     const el = containerRef.current
@@ -168,7 +173,7 @@ export function Timeline({
       const direction = e.deltaY > 0 ? 1 : -1
       const stepSec   = e.shiftKey
         ? direction * secondsRef.current
-        : direction * framesRef.current * (1 / DEFAULT_FPS)
+        : direction * framesRef.current * (1 / (fpsRef.current || DEFAULT_FPS))
       const newPos    = clamp(playheadRef.current + stepSec, 0, duration)
       onSeek(newPos)
     }
@@ -183,18 +188,74 @@ export function Timeline({
   // Convert an absolute time into a visible-window pixel x.
   const xOf = (t: number) => timeToPixel(t - effectiveViewStart, w, visibleDuration)
 
-  // Ruler ticks — only generate ticks within the visible window.
-  const tickInterval = computeTickInterval(visibleDuration, w)
-  const ticks: { time: number; major: boolean }[] = []
-  if (duration > 0 && w > 0 && visibleDuration > 0) {
+  // Ruler ticks and segment blocks are memoized on everything they depend on
+  // *except* playheadPosition. At zoom = 1 effectiveViewStart is constant, so
+  // these element references stay stable while the playhead moves ~30–60×/s and
+  // React skips re-rendering them — only the inline playhead below moves.
+  const rulerTicks = useMemo(() => {
+    if (!(duration > 0 && w > 0 && visibleDuration > 0)) return null
+    const tickInterval = computeTickInterval(visibleDuration, w)
     const firstTick = Math.floor(effectiveViewStart / tickInterval) * tickInterval
     const lastTick  = effectiveViewStart + visibleDuration
+    const els: React.ReactNode[] = []
     for (let t = firstTick; t <= lastTick; t += tickInterval) {
       if (t < 0) continue
-      const isMajor = Math.round(t / tickInterval) % 5 === 0
-      ticks.push({ time: t, major: isMajor })
+      const major = Math.round(t / tickInterval) % 5 === 0
+      const x = timeToPixel(t - effectiveViewStart, w, visibleDuration)
+      els.push(
+        <div key={t}>
+          <div className={`ruler-tick ${major ? 'major' : ''}`} style={{ left: x }} />
+          {major && (
+            <span className="ruler-label" style={{ left: x }}>
+              {formatTickLabel(t)}
+            </span>
+          )}
+        </div>
+      )
     }
-  }
+    return els
+  }, [duration, w, effectiveViewStart, visibleDuration])
+
+  const segmentBlocks = useMemo(() =>
+    segments.map(seg => {
+      const left  = duration > 0 ? timeToPixel(seg.start - effectiveViewStart, w, visibleDuration) : 0
+      const right = duration > 0 ? timeToPixel(seg.end   - effectiveViewStart, w, visibleDuration) : 0
+      const width = Math.max(right - left, MIN_SEGMENT_PX)
+      const isSelected = seg.id === selectedSegmentId
+
+      return (
+        <div
+          key={seg.id}
+          className={`segment-block${isSelected ? ' selected' : ''}`}
+          style={{
+            left,
+            width,
+            background: seg.color + '44',
+            borderColor: seg.color,
+          }}
+          onMouseDown={e => {
+            e.stopPropagation()
+            onSelectSegment(seg.id)
+          }}
+          title={`${formatTime(seg.start)} – ${formatTime(seg.end)}`}
+        >
+          {/* Left (start) handle */}
+          <div
+            className="seg-handle seg-handle-left"
+            onMouseDown={e => startDrag(e, 'start', seg)}
+            title="Drag to adjust start (or press I)"
+          />
+          {/* Right (end) handle */}
+          <div
+            className="seg-handle seg-handle-right"
+            onMouseDown={e => startDrag(e, 'end', seg)}
+            title="Drag to adjust end (or press O)"
+          />
+        </div>
+      )
+    }),
+    [segments, selectedSegmentId, duration, w, effectiveViewStart, visibleDuration, startDrag, onSelectSegment]
+  )
 
   const playheadX = duration > 0 ? xOf(playheadPosition) : 0
 
@@ -205,22 +266,7 @@ export function Timeline({
     >
       {/* ── Ruler ── */}
       <div className="ruler-area" onMouseDown={handleRulerMouseDown}>
-        {ticks.map(({ time, major }) => {
-          const x = xOf(time)
-          return (
-            <div key={time}>
-              <div
-                className={`ruler-tick ${major ? 'major' : ''}`}
-                style={{ left: x }}
-              />
-              {major && (
-                <span className="ruler-label" style={{ left: x }}>
-                  {formatTickLabel(time)}
-                </span>
-              )}
-            </div>
-          )
-        })}
+        {rulerTicks}
       </div>
 
       {/* ── Segments ── */}
@@ -233,43 +279,7 @@ export function Timeline({
           }
         }}
       >
-        {segments.map(seg => {
-          const left  = duration > 0 ? xOf(seg.start) : 0
-          const right = duration > 0 ? xOf(seg.end)   : 0
-          const width = Math.max(right - left, MIN_SEGMENT_PX)
-          const isSelected = seg.id === selectedSegmentId
-
-          return (
-            <div
-              key={seg.id}
-              className={`segment-block${isSelected ? ' selected' : ''}`}
-              style={{
-                left,
-                width,
-                background: seg.color + '44',
-                borderColor: seg.color,
-              }}
-              onMouseDown={e => {
-                e.stopPropagation()
-                onSelectSegment(seg.id)
-              }}
-              title={`${formatTime(seg.start)} – ${formatTime(seg.end)}`}
-            >
-              {/* Left (start) handle */}
-              <div
-                className="seg-handle seg-handle-left"
-                onMouseDown={e => startDrag(e, 'start', seg)}
-                title="Drag to adjust start (or press I)"
-              />
-              {/* Right (end) handle */}
-              <div
-                className="seg-handle seg-handle-right"
-                onMouseDown={e => startDrag(e, 'end', seg)}
-                title="Drag to adjust end (or press O)"
-              />
-            </div>
-          )
-        })}
+        {segmentBlocks}
       </div>
 
       {/* ── Playhead ── */}

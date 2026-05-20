@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Segment, ExportMode, CodecMode, Codec, Container, ExportParams, ExportProgressPayload, HwEncoder } from '../types'
@@ -142,20 +142,22 @@ export function ExportModal({
   const toggleAll = () =>
     setSelectedIds(allSelected ? new Set() : new Set(sortedSegments.map(seg => seg.id)))
 
-  // Subscribe to export-progress events while modal is open.
-  // Use an `aborted` flag to handle the race where the component unmounts
-  // before the async listen() promise resolves; clear the completion timer on
-  // unmount so we don't fire onExportComplete on a torn-down parent.
+  // Completion is driven by the export_segments invoke resolving (the
+  // authoritative "done" signal), not by a progress event — the last segment can
+  // momentarily report 100% before ffmpeg finalizes. This timer lets the bar sit
+  // at 100% briefly before the modal closes; it's held in a ref so unmount can
+  // clear it and we never call onExportComplete on a torn-down parent.
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Subscribe to export-progress events (bar updates only) while modal is open.
+  // The `aborted` flag handles the race where the component unmounts before the
+  // async listen() promise resolves.
   useEffect(() => {
     let unlisten: (() => void) | null = null
     let aborted = false
-    let completionTimer: ReturnType<typeof setTimeout> | null = null
 
     listen<ExportProgressPayload>('export-progress', e => {
       setS(prev => ({ ...prev, progress: e.payload.percent }))
-      if (e.payload.percent >= 100) {
-        completionTimer = setTimeout(() => onExportComplete(), 400)
-      }
     }).then(ul => {
       if (aborted) {
         ul()  // Already unmounted — immediately unsubscribe
@@ -167,9 +169,9 @@ export function ExportModal({
     return () => {
       aborted = true
       unlisten?.()
-      if (completionTimer !== null) clearTimeout(completionTimer)
+      if (completionTimerRef.current !== null) clearTimeout(completionTimerRef.current)
     }
-  }, [onExportComplete])
+  }, [])
 
   const handlePickDir = async () => {
     const dir = await invoke<string | null>('pick_output_dir')
@@ -195,7 +197,9 @@ export function ExportModal({
 
     try {
       await invoke('export_segments', { params })
-      // onExportComplete is called via the 100% progress event.
+      // Export finished — fill the bar, then close after a short beat.
+      setS(prev => ({ ...prev, progress: 100 }))
+      completionTimerRef.current = setTimeout(() => onExportComplete(), 400)
     } catch (e) {
       const msg = String(e)
       setS(prev => ({ ...prev, phase: 'error', error: msg }))

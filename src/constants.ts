@@ -16,8 +16,8 @@ export const TIMELINE_RULER_HEIGHT = 18  // px — top ruler band
 export const HANDLE_WIDTH         = 12   // px — drag handle width on each segment side
 export const PLAYHEAD_HEAD_WIDTH  = 19   // px — triangle base width
 
-// Assumed frame rate used for scroll-wheel stepping when no file is loaded.
-// Updated at runtime via useMpv once a file loads (via video-loaded event).
+// Fallback frame rate for scroll-wheel frame-stepping, used until mpv reports
+// the loaded clip's container-fps (observed in useMpv and held in AppState.fps).
 export const DEFAULT_FPS = 30
 
 // ── User-configurable scroll-wheel stepping (persisted to localStorage) ──────
