@@ -99,7 +99,7 @@ html, body, #root {
   text-decoration: underline;
 }
 
-/* ── Playback controls ───────────────────────────────────────────────────── */
+/* ── Unified control bar (transport + segment edit/nav + zoom) ───────────── */
 .playback-controls {
   height: 48px;
   background: var(--bg-toolbar);
@@ -107,54 +107,38 @@ html, body, #root {
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 12px;
   flex-shrink: 0;
   padding: 0 16px;
 }
 
-/* ── Segment controls (also hosts the zoom slider on the right) ──────────── */
-.segment-controls {
-  height: 44px;
-  background: var(--bg-toolbar);
-  border-bottom: 1px solid var(--border);
+/* Three groups: edit-tools left, transport centered, segment-nav + zoom right.
+   The flexed left/right groups keep the center transport group visually centered. */
+.pc-group {
   display: flex;
   align-items: center;
-  justify-content: flex-start;  /* segment buttons left, zoom group right via margin-left:auto */
   gap: 8px;
-  flex-shrink: 0;
-  padding: 0 16px;
+}
+.pc-group--left {
+  flex: 1;
+  justify-content: flex-start;
+}
+.pc-group--center {
+  justify-content: center;
+  padding: 0 12px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.pc-group--right {
+  flex: 1;
+  justify-content: flex-end;
 }
 
-/* ── Timeline zoom group (lives inside .segment-controls) ────────────────── */
-.timeline-zoom {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.timeline-zoom-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-.timeline-zoom-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* ── Timeline zoom slider (in the right control group) ───────────────────── */
 .timeline-zoom-slider {
   width: 160px;
   accent-color: var(--accent);
   cursor: pointer;
-}
-.timeline-zoom-value {
-  font-size: 11px;
-  color: var(--text-primary);
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
-  min-width: 36px;
-  text-align: right;
 }
 
 /* ── Timeline strip ──────────────────────────────────────────────────────── */

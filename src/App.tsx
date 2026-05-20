@@ -11,7 +11,6 @@ import { useKeyboard } from './hooks/useKeyboard'
 import { HwSupport, ContextMenuScope, ContextMenuStatus } from './types'
 
 import { PlaybackControls } from './components/PlaybackControls'
-import { SegmentControls } from './components/SegmentControls'
 import { Timeline } from './components/Timeline'
 import { ExportModal } from './components/ExportModal'
 import { SettingsModal } from './components/SettingsModal'
@@ -202,7 +201,7 @@ export default function App() {
         )}
       </div>
 
-      {/* ── Playback controls ── */}
+      {/* ── Unified control bar (transport + segment edit/nav + zoom) ── */}
       <PlaybackControls
         currentTime={state.playheadPosition}
         duration={state.duration}
@@ -213,13 +212,7 @@ export default function App() {
         onFrameStep={playback.frameStep}
         onFrameBackStep={playback.frameBackStep}
         onToggleMute={handleToggleMute}
-      />
-
-      {/* ── Segment controls (now also hosts the zoom slider on the right) ── */}
-      <SegmentControls
         selectedSegmentId={state.selectedSegmentId}
-        duration={state.duration}
-        zoom={timelineZoom}
         selectedSegmentNumber={selectedSegmentNumber}
         segmentCount={segmentCount}
         onSetStart={() => {
@@ -239,6 +232,7 @@ export default function App() {
           }
         }}
         onSelectNext={actions.selectNextSegment}
+        zoom={timelineZoom}
         onChangeZoom={setTimelineZoom}
       />
 
