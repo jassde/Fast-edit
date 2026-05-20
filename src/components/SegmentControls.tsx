@@ -2,10 +2,13 @@ type SegmentControlsProps = {
   selectedSegmentId: string | null
   duration: number
   zoom: number
+  selectedSegmentNumber: number | null  // 1-based position in start order, null = nothing selected
+  segmentCount: number
   onSetStart: () => void
   onSetEnd: () => void
   onAddSegment: () => void
   onDeleteSegment: () => void
+  onSelectNext: () => void
   onChangeZoom: (n: number) => void
 }
 
@@ -13,10 +16,13 @@ export function SegmentControls({
   selectedSegmentId,
   duration,
   zoom,
+  selectedSegmentNumber,
+  segmentCount,
   onSetStart,
   onSetEnd,
   onAddSegment,
   onDeleteSegment,
+  onSelectNext,
   onChangeZoom,
 }: SegmentControlsProps) {
   const hasFile     = duration > 0
@@ -59,6 +65,22 @@ export function SegmentControls({
       >
         Delete Segment
       </button>
+
+      {/* Next-segment cycler + selection indicator */}
+      <button
+        className="btn"
+        disabled={segmentCount === 0}
+        onClick={onSelectNext}
+        title="Select next segment (wraps to the first)"
+      >
+        Next ▸
+      </button>
+
+      <span className="segment-indicator" title="Currently selected segment">
+        {segmentCount === 0
+          ? 'No segments'
+          : `Segment ${selectedSegmentNumber ?? '–'} / ${segmentCount}`}
+      </span>
 
       {/* Zoom slider — right-aligned via margin-left:auto on the wrapper.
           The <label> wraps only the visible "Zoom" text + slider so click on

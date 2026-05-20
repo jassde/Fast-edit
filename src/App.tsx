@@ -1,5 +1,5 @@
 import './App.css'
-import { useRef, useCallback, useEffect, useState } from 'react'
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -144,6 +144,19 @@ export default function App() {
   // centered on the playhead.
   const [timelineZoom, setTimelineZoom] = useState<number>(1)
 
+  // Selected segment's 1-based position in start order + total count, for the
+  // segment indicator. Same sort key as selectNextSegment so they agree.
+  const { selectedSegmentNumber, segmentCount } = useMemo(() => {
+    const sorted = [...state.segments].sort((a, b) => a.start - b.start)
+    const idx = state.selectedSegmentId
+      ? sorted.findIndex(seg => seg.id === state.selectedSegmentId)
+      : -1
+    return {
+      selectedSegmentNumber: idx >= 0 ? idx + 1 : null,
+      segmentCount: sorted.length,
+    }
+  }, [state.segments, state.selectedSegmentId])
+
   return (
     <div className="app-shell">
 
@@ -207,6 +220,8 @@ export default function App() {
         selectedSegmentId={state.selectedSegmentId}
         duration={state.duration}
         zoom={timelineZoom}
+        selectedSegmentNumber={selectedSegmentNumber}
+        segmentCount={segmentCount}
         onSetStart={() => {
           if (state.selectedSegmentId) {
             actions.setSelectedStart(state.playheadPosition)
@@ -223,6 +238,7 @@ export default function App() {
             actions.deleteSegment(state.selectedSegmentId)
           }
         }}
+        onSelectNext={actions.selectNextSegment}
         onChangeZoom={setTimelineZoom}
       />
 

@@ -240,6 +240,50 @@ html, body, #root {
   background: #262626;
 }
 
+/* ── Export segment checklist ────────────────────────────────────────────── */
+.segment-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 168px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  background: var(--bg-deep);
+}
+.segment-checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.segment-checklist-row:hover { background: var(--bg-active); }
+.segment-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.segment-checklist-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+}
+
+/* ── Segment selection indicator ─────────────────────────────────────────── */
+.segment-indicator {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
 /* ── Time display ────────────────────────────────────────────────────────── */
 .time-display {
   font-variant-numeric: tabular-nums;

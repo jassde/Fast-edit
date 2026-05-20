@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Segment, ExportMode, CodecMode, Codec, Container, ExportParams, ExportProgressPayload, HwEncoder } from '../types'
-import { expandFilename } from '../utils'
+import { expandFilename, formatTime } from '../utils'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -116,6 +116,32 @@ export function ExportModal({
 }: ExportModalProps) {
   const [s, setS] = useState<ModalState>(INITIAL)
 
+  // Which segments to export. `segments` is stable while the modal is open
+  // (it's a separate screen), so initialize once, all-checked — preserving the
+  // historical "export everything" default.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(segments.map(seg => seg.id))
+  )
+  const sortedSegments = useMemo(
+    () => [...segments].sort((a, b) => a.start - b.start),
+    [segments]
+  )
+  const chosen = useMemo(
+    () => sortedSegments.filter(seg => selectedIds.has(seg.id)),
+    [sortedSegments, selectedIds]
+  )
+  const allSelected = chosen.length === sortedSegments.length && sortedSegments.length > 0
+
+  const toggleSegment = (id: string) =>
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const toggleAll = () =>
+    setSelectedIds(allSelected ? new Set() : new Set(sortedSegments.map(seg => seg.id)))
+
   // Subscribe to export-progress events while modal is open.
   // Use an `aborted` flag to handle the race where the component unmounts
   // before the async listen() promise resolves; clear the completion timer on
@@ -157,7 +183,7 @@ export function ExportModal({
     const params: ExportParams = {
       filePath,
       outputDir: s.outputDir,
-      segments: segments.map(seg => ({ start: seg.start, end: seg.end })),
+      segments: chosen.map(seg => ({ start: seg.start, end: seg.end })),
       exportMode: s.exportMode,
       codecMode: s.codecMode,
       codec: s.codecMode === 'reencode' ? s.codec : undefined,
@@ -216,6 +242,32 @@ export function ExportModal({
                   {s.outputDir ?? <em style={{ color: 'var(--text-muted)' }}>Not selected</em>}
                 </span>
                 <button className="btn" onClick={handlePickDir}>Browse…</button>
+              </div>
+            </div>
+
+            {/* Segments to export */}
+            <div className="modal-field">
+              <div className="modal-row" style={{ justifyContent: 'space-between' }}>
+                <span className="modal-label">Segments to export</span>
+                <button className="btn" onClick={toggleAll} disabled={sortedSegments.length === 0}>
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
+              <div className="segment-checklist">
+                {sortedSegments.map((seg, i) => (
+                  <label key={seg.id} className="segment-checklist-row">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(seg.id)}
+                      onChange={() => toggleSegment(seg.id)}
+                    />
+                    <span className="segment-swatch" style={{ background: seg.color }} />
+                    <span>Segment {i + 1}</span>
+                    <span className="segment-checklist-time">
+                      {formatTime(seg.start)} – {formatTime(seg.end)}
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -342,10 +394,10 @@ export function ExportModal({
               <button className="btn" onClick={onClose}>Cancel</button>
               <button
                 className="btn btn-primary"
-                disabled={!s.outputDir || segments.length === 0}
+                disabled={!s.outputDir || chosen.length === 0}
                 onClick={handleExport}
               >
-                Export {segments.length} segment{segments.length !== 1 ? 's' : ''}
+                Export {chosen.length} segment{chosen.length !== 1 ? 's' : ''}
               </button>
             </div>
           </>
