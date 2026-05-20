@@ -1,0 +1,118 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+A Tauri v2 desktop app for video trimming. Users open a video file, mark one or more segments on a timeline, and export them via ffmpeg (with optional re-encode). Playback uses libmpv via [`tauri-plugin-libmpv`](https://github.com/nini22P/tauri-plugin-libmpv); ffmpeg handles export.
+
+## Commands
+
+```bash
+# Full dev mode (Rust backend + React frontend with hot reload)
+npm run tauri -- dev
+
+# Frontend only (no Rust, for UI iteration)
+npm run dev
+
+# Production build
+npm run tauri -- build
+
+# Type-check frontend
+npm run build
+
+# Rust unit tests (ffmpeg arg builder, time parser, filename expansion)
+cd src-tauri && cargo test
+
+# One-time setup: download libmpv-2.dll + libmpv-wrapper.dll into src-tauri/lib/
+# Required after a fresh clone — the DLLs are gitignored.
+npx tauri-plugin-libmpv-api setup-lib
+```
+
+No lint command is configured.
+
+## Architecture
+
+### Communication Flow
+
+```
+React (WebView, transparent)  ←→  Tauri IPC  ←→  Rust
+                                                  ├── tauri-plugin-libmpv → libmpv-2.dll (in-process FFI)
+                                                  └── ffmpeg.rs           → ffmpeg.exe (subprocess)
+                                              ▲
+            mpv renders into the host window  │  behind the WebView, constrained
+            to the #video-panel rect via setVideoMarginRatio.
+```
+
+There is no Rust mpv code in this repo. The plugin owns the mpv lifecycle, property observation, and command dispatch. The frontend talks to mpv directly via the plugin's TS API (`init`, `command`, `setProperty`, `observeProperties`, `setVideoMarginRatio`).
+
+### Frontend (`src/`)
+
+- `App.tsx` — root component; lays out the chrome and a `#video-panel` div (the slot mpv renders behind). Manages segment state via `useAppState`.
+- `hooks/useMpv.ts` — owns the libmpv plugin lifecycle:
+  - `init()` once on mount with `vo: gpu-next`, `hwdec: auto-safe`, `keep-open: yes`, `force-window: yes`, `pause: yes`, `hr-seek: yes`.
+  - Observes `time-pos` / `duration` / `pause` / `eof-reached` and pushes them into `AppState`.
+  - ResizeObserves `#video-panel` and calls `setVideoMarginRatio({left, right, top, bottom})` so mpv only paints inside that rectangle.
+  - Calls `command('loadfile', [path])` when `filePath` changes.
+  - Returns `{ play, pause, seek, frameStep, frameBackStep }` to App and useKeyboard.
+- `hooks/useAppState.ts` — single `useReducer`-style hook holding segments, playhead, duration, file path, modal/error state.
+- `hooks/useKeyboard.ts` — global keydown handler (Space, ←/→, I, O, Delete); reads state via refs to avoid re-registering on every render.
+- `hooks/useFileDrop.ts` — Tauri webview drag-drop, filtered by extension.
+- `components/Timeline.tsx` — ruler, segments, playhead, drag handles. Wheel listener attached natively (non-passive) so `preventDefault` works.
+- `components/ExportModal.tsx` — output dir picker, mode/codec/quality form, progress UI driven by the `export-progress` Tauri event.
+- File drop is handled via Tauri's `onDragDropEvent`.
+- No CSS framework — custom dark theme. The body and `.video-panel` are `background: transparent`; every chrome region (top bar, controls, timeline, modal) sets its own opaque background.
+
+### Rust Backend (`src-tauri/src/`)
+
+- **`lib.rs`** — registers `tauri_plugin_libmpv::init()`, `tauri_plugin_dialog`, `tauri_plugin_opener`. Resolves ffmpeg path at startup and stores it in `FfmpegState`. Registers two commands: `export_segments`, `pick_output_dir`.
+- **`ffmpeg.rs`** — spawns `ffmpeg.exe` for each segment (or merge step), parses stderr `time=` for progress, emits `export-progress` events. Includes `TempCleanup` RAII guard so a mid-merge error doesn't leave temp segments behind. Has unit tests for arg building, progress parsing, and filename expansion.
+- **`main.rs`** — minimal entry point, calls `edit_lib::run()`.
+
+### libmpv setup
+
+The plugin needs two DLLs at runtime, both in `src-tauri/lib/` (gitignored):
+
+- `libmpv-2.dll` — libmpv (~96 MB). The mpv player core compiled as a shared library.
+- `libmpv-wrapper.dll` — thin C ABI shim the plugin loads via `libloading`.
+
+Run `npx tauri-plugin-libmpv-api setup-lib` to download both. `tauri.conf.json` bundles `lib/**/*` as resources so they ship with `tauri build`.
+
+### ffmpeg
+
+`ffmpeg.exe` is **not** currently bundled (no resource entry in `tauri.conf.json`). `find_ffmpeg` resolves it by checking `<resource_dir>/ffmpeg/bin/ffmpeg.exe` first, then walks up from the current executable to find `ffmpeg/bin/ffmpeg.exe` or `ffmpeg/ffmpeg.exe` — which works in dev because the project root has `ffmpeg/bin/ffmpeg.exe`. For production builds, either re-add the resource entry or document that ffmpeg must be installed alongside the binary.
+
+#### ffmpeg argument shapes
+
+```bash
+# Stream copy (fast, keyframe-aligned)
+ffmpeg -ss <start> -to <end> -i <input> -c copy -avoid_negative_ts make_zero <output>
+
+# Re-encode (frame-accurate)
+ffmpeg -ss <start> -to <end> -i <input> -c:v <codec> -crf <quality> -c:a aac <output>
+
+# Merge segments — concat list paths use forward slashes; single quotes escaped as '\''
+ffmpeg -f concat -safe 0 -i list.txt -c copy <output>
+```
+
+Merge mode picks the temp-file extension to match the input's container in copy mode (so mp4-incompatible codecs like VP9/Opus don't fail) and `.webm` for VP9 reencode.
+
+### Segment Rules
+
+Segments cannot overlap. Handle dragging is clamped at neighboring segment boundaries. "Add Segment" creates a 5-second default at the playhead, clamped to video bounds and shrunk to avoid overlap.
+
+## Key Design Decisions
+
+- **No UI framework** — plain CSS, small bundle, no style conflicts with the libmpv render area.
+- **libmpv via plugin** — mpv runs in-process as `libmpv-2.dll`; no subprocess, no named pipe IPC. The Tauri window is `transparent: true` and mpv paints behind the WebView, with its render rect constrained to the `#video-panel` div via `setVideoMarginRatio`. Property changes (time-pos, duration, pause, eof-reached) flow back as `mpv-event-{windowLabel}` Tauri events.
+- **Why transparency, not `--wid` HWND embedding** — the plugin's primary integration mode is the transparent overlay. It does support `--wid` override, but the overlay path needs no Win32 child-window code on our side and `setVideoMarginRatio` cleanly handles the panel-rect plumbing.
+- **Capabilities** — `libmpv:default` is required in `src-tauri/capabilities/default.json` to authorize the plugin's IPC commands.
+- **Keyboard shortcuts** (Space, ←/→, I, O, Delete) are disabled when the export modal is open or focus is in an input/select/textarea.
+- **Design spec** is in `2026-04-08-video-trimmer-design.md` — refer to it for UI layout, color palette, timeline interactions, and export modal details.
+
+## Gotchas
+
+- After a fresh clone, builds will fail until you run `npx tauri-plugin-libmpv-api setup-lib` to populate `src-tauri/lib/`.
+- React `onWheel` attaches a passive listener — `preventDefault` is a no-op there. Timeline wheel handling uses `addEventListener('wheel', …, { passive: false })` instead.
+- StrictMode double-invokes effects in dev. `useMpv` defends with `await destroy().catch(() => {})` before each `init()` so the second mount doesn't fail on a stale instance.
+- The window is `transparent: true`. Any chrome region without an explicit opaque background will show through to the desktop.

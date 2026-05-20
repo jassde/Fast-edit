@@ -1,0 +1,556 @@
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+:root {
+  /* User-specified palette */
+  --bg-deep:    #1f1f1e;   /* page background, content areas, recessed inputs */
+  --bg-toolbar: #434447;   /* chrome bars (top-bar, controls, timeline toolbar), modal panel */
+  --accent:     #f34245;   /* primary actions, focus, slider tracks, errors */
+
+  /* Derived for ergonomics */
+  --bg-surface: #545558;   /* buttons & raised elements sitting on a toolbar (lighter than toolbar) */
+  --bg-hover:   #65666a;   /* btn:hover — one step lighter */
+  --bg-active:  #38393b;   /* btn:active — one step darker (pressed) */
+  --border:     #2c2c2d;   /* subtle dark separator that reads on both deep and toolbar backgrounds */
+  --text-primary: #ececea; /* slightly warm-tinted near-white */
+  --text-muted:   #9a9a98; /* warm-neutral muted; ≥3:1 on toolbar */
+
+  /* Soft accent variants for error/info tinted surfaces */
+  --accent-soft-bg:     rgba(243, 66, 69, 0.10);
+  --accent-soft-border: rgba(243, 66, 69, 0.32);
+
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  /* Transparent so the libmpv plugin can render its video output behind the
+     WebView. Each chrome region (top-bar, controls, timeline-strip, modal)
+     paints its own opaque background; only #video-panel is see-through. */
+  background: transparent;
+}
+
+/* ── App shell layout ────────────────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.top-bar {
+  height: 44px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+/* ── Video panel ─────────────────────────────────────────────────────────── */
+.video-panel {
+  flex: 1;
+  /* Transparent — mpv paints behind the WebView and the libmpv plugin
+     constrains its render rect to this div via setVideoMarginRatio
+     (see useMpv.ts). The mpv-error-banner below provides an opaque
+     background when no file is loaded or when init fails. */
+  background: transparent;
+  position: relative;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.mpv-error-banner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--bg-deep);
+  color: var(--accent);
+  font-size: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+.mpv-error-banner a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ── Playback controls ───────────────────────────────────────────────────── */
+.playback-controls {
+  height: 48px;
+  background: var(--bg-toolbar);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0 16px;
+}
+
+/* ── Segment controls (also hosts the zoom slider on the right) ──────────── */
+.segment-controls {
+  height: 44px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;  /* segment buttons left, zoom group right via margin-left:auto */
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0 16px;
+}
+
+/* ── Timeline zoom group (lives inside .segment-controls) ────────────────── */
+.timeline-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.timeline-zoom-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.timeline-zoom-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.timeline-zoom-slider {
+  width: 160px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.timeline-zoom-value {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Timeline strip ──────────────────────────────────────────────────────── */
+.timeline-strip {
+  height: 90px;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  padding: 5px 13px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.btn:active:not(:disabled) {
+  background: var(--bg-active);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.15);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-danger {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.15);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-icon {
+  padding: 5px 10px;
+  font-size: 15px;
+}
+
+/* Chrome-bar buttons (Open File, Settings) — quieter dark surface so they
+   sit calmly on the toolbar without competing with the accent Export button. */
+.btn-chrome {
+  background: #313030;
+}
+
+.btn-chrome:hover:not(:disabled) {
+  background: #3a3a3a;
+  border-color: var(--accent);
+}
+
+.btn-chrome:active:not(:disabled) {
+  background: #262626;
+}
+
+/* ── Time display ────────────────────────────────────────────────────────── */
+.time-display {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 88px;
+  text-align: center;
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+}
+
+/* ── Timeline component ──────────────────────────────────────────────────── */
+.timeline-container {
+  position: relative;
+  width: 100%;
+  height: 90px;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+}
+
+.ruler-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 6px;
+  background: var(--text-muted);
+  pointer-events: none;
+}
+
+.ruler-tick.major {
+  height: 12px;
+  background: var(--text-primary);
+}
+
+.ruler-label {
+  position: absolute;
+  top: 2px;
+  font-size: 9px;
+  color: var(--text-muted);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+}
+
+.segments-area {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.segment-block {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border: 1.5px solid;
+  border-radius: 3px;
+  min-width: 4px;
+  cursor: pointer;
+}
+
+.segment-block.selected {
+  border-width: 2px;
+  filter: brightness(1.25);
+}
+
+.seg-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.seg-handle:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.seg-handle-left {
+  left: 0;
+  border-radius: 2px 0 0 2px;
+}
+
+.seg-handle-right {
+  right: 0;
+  border-radius: 0 2px 2px 0;
+}
+
+/* Grip lines inside handles */
+.seg-handle::before,
+.seg-handle::after {
+  content: '';
+  width: 1px;
+  height: 55%;
+  background: var(--text-muted);
+  border-radius: 1px;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.playhead-head {
+  width: 0;
+  height: 0;
+  margin-left: -9px;
+  border-left:  9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top:   10px solid #fff;
+}
+
+.playhead-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Export modal ────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  width: 460px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.modal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.modal-path {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Consolas', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-radio-group {
+  display: flex;
+  gap: 16px;
+}
+
+.modal-radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.modal-select {
+  padding: 5px 8px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-deep);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.1s;
+}
+
+.modal-error {
+  color: var(--accent);
+  font-size: 13px;
+  background: var(--accent-soft-bg);
+  border: 1px solid var(--accent-soft-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── Settings sliders ────────────────────────────────────────────────────── */
+.settings-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.settings-slider-bound {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 20px;
+  text-align: center;
+}
+
+.settings-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
