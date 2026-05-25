@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { emit, listen } from '@tauri-apps/api/event'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   MIN_FRAMES_PER_SCROLL_TICK,
   MAX_FRAMES_PER_SCROLL_TICK,
@@ -12,7 +12,6 @@ import {
 } from '../constants'
 import { clamp } from '../utils'
 
-// Mirror the persisted settings shape from useAppState.
 type PersistedSettings = {
   framesPerScrollTick?: number
   secondsPerShiftScrollTick?: number
@@ -48,7 +47,6 @@ export function ScrollPanelApp() {
   const [frames,  setFrames]  = useState(() => readFromStorage().frames)
   const [seconds, setSeconds] = useState(() => readFromStorage().seconds)
 
-  // Sync incoming state from the main window.
   useEffect(() => {
     let unlisten: (() => void) | null = null
     let aborted = false
@@ -67,16 +65,6 @@ export function ScrollPanelApp() {
     }
   }, [])
 
-  // Re-focus the main window on every mousedown so keyboard shortcuts keep
-  // working in the editor while the user adjusts sliders here.
-  useEffect(() => {
-    const refocus = () => {
-      WebviewWindow.getByLabel('main').then(win => win?.setFocus())
-    }
-    document.addEventListener('mousedown', refocus, { capture: true })
-    return () => document.removeEventListener('mousedown', refocus, { capture: true })
-  }, [])
-
   const handleFramesChange = (value: number) => {
     setFrames(value)
     emit<ScrollSettingsChangePayload>('scroll-settings-change', { kind: 'frames', value }).catch(console.error)
@@ -88,7 +76,7 @@ export function ScrollPanelApp() {
   }
 
   const handleClose = () => {
-    emit('scroll-panel-close', null).catch(console.error)
+    getCurrentWindow().close().catch(console.error)
   }
 
   return (
@@ -106,7 +94,6 @@ export function ScrollPanelApp() {
       </div>
 
       <div className="float-panel-body">
-        {/* Frames per scroll tick */}
         <div>
           <span className="modal-label">
             Scroll wheel: <strong>{frames}</strong> frame{frames === 1 ? '' : 's'} per tick
@@ -127,7 +114,6 @@ export function ScrollPanelApp() {
           </div>
         </div>
 
-        {/* Seconds per shift+scroll tick */}
         <div>
           <span className="modal-label">
             Shift + scroll: <strong>{seconds}</strong> second{seconds === 1 ? '' : 's'} per tick

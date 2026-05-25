@@ -4,6 +4,8 @@
   "description": "Capability for the floating scroll-step panel window.",
   "windows": ["scroll-panel"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
   ]
 }
