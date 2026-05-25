@@ -7,25 +7,38 @@
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  /* User-specified palette */
-  --bg-deep:    #1f1f1e;   /* page background, content areas, recessed inputs */
-  --bg-toolbar: #434447;   /* chrome bars (top-bar, controls, timeline toolbar), modal panel */
-  --accent:     #f34245;   /* primary actions, focus, slider tracks, errors */
+  /* Warm-tinted neutrals (hue ~25, very low chroma). Tinting toward the
+     brand red keeps the chrome from reading as a flat photographic gray. */
+  --bg-deep:    oklch(0.20 0.005 25);   /* page background, recessed inputs, timeline */
+  --bg-toolbar: oklch(0.32 0.005 25);   /* top bar, controls bar, modal panel */
+  --bg-surface: oklch(0.40 0.005 25);   /* default buttons */
+  --bg-hover:   oklch(0.46 0.005 25);
+  --bg-active:  oklch(0.27 0.005 25);
+  --bg-chrome:  oklch(0.26 0.005 25);   /* quieter chrome-bar buttons */
+  --border:     oklch(0.24 0.005 25);
 
-  /* Derived for ergonomics */
-  --bg-surface: #545558;   /* buttons & raised elements sitting on a toolbar (lighter than toolbar) */
-  --bg-hover:   #65666a;   /* btn:hover — one step lighter */
-  --bg-active:  #38393b;   /* btn:active — one step darker (pressed) */
-  --border:     #2c2c2d;   /* subtle dark separator that reads on both deep and toolbar backgrounds */
-  --text-primary: #ececea; /* slightly warm-tinted near-white */
-  --text-muted:   #9a9a98; /* warm-neutral muted; ≥3:1 on toolbar */
+  --text-primary: oklch(0.94 0.005 60); /* warm cream, not #fff */
+  --text-muted:   oklch(0.68 0.005 25);
 
-  /* Soft accent variants for error/info tinted surfaces */
-  --accent-soft-bg:     rgba(243, 66, 69, 0.10);
-  --accent-soft-border: rgba(243, 66, 69, 0.32);
+  /* Roles. Primary is the confirmation/terminal action. Danger is the
+     destructive role — kept distinct in shape (outlined) so the two never
+     look identical. */
+  --accent:        oklch(0.62 0.18 25);
+  --accent-hover:  oklch(0.68 0.18 25);
+  --accent-soft-bg:     color-mix(in oklch, var(--accent) 12%, transparent);
+  --accent-soft-border: color-mix(in oklch, var(--accent) 36%, transparent);
+
+  --danger:        oklch(0.58 0.16 25);
+  --danger-hover:  oklch(0.66 0.18 25);
+
+  /* Focus ring — same hue, semi-transparent. */
+  --focus-ring:    color-mix(in oklch, var(--accent) 60%, transparent);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
   font-family: Inter, system-ui, -apple-system, sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
 }
@@ -33,13 +46,21 @@
 html, body, #root {
   height: 100%;
   overflow: hidden;
-  /* Transparent so the libmpv plugin can render its video output behind the
-     WebView. Each chrome region (top-bar, controls, timeline-strip, modal)
-     paints its own opaque background; only #video-panel is see-through. */
+  /* Transparent so libmpv can render its video output behind the WebView.
+     Each chrome region paints its own opaque background; only #video-panel
+     is see-through. */
   background: transparent;
 }
 
-/* ── App shell layout ────────────────────────────────────────────────────── */
+/* ── Global focus ring (keyboard only) ───────────────────────────────────── */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -59,9 +80,10 @@ html, body, #root {
 }
 
 .app-title {
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-primary);
   margin-right: 4px;
 }
@@ -69,17 +91,25 @@ html, body, #root {
 /* ── Video panel ─────────────────────────────────────────────────────────── */
 .video-panel {
   flex: 1;
-  /* Transparent — mpv paints behind the WebView and the libmpv plugin
-     constrains its render rect to this div via setVideoMarginRatio
-     (see useMpv.ts). The mpv-error-banner below provides an opaque
-     background when no file is loaded or when init fails. */
   background: transparent;
   position: relative;
   min-height: 200px;
   overflow: hidden;
 }
 
-.mpv-error-banner {
+/* Drop-target feedback while a file is being dragged over the window. */
+.video-panel.drag-over::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft-bg);
+  pointer-events: none;
+}
+
+/* Empty-state and error banners share a layout but not a color role. */
+.video-banner {
   position: absolute;
   inset: 0;
   display: flex;
@@ -88,16 +118,13 @@ html, body, #root {
   justify-content: center;
   gap: 12px;
   background: var(--bg-deep);
-  color: var(--accent);
-  font-size: 14px;
   padding: 24px;
   text-align: center;
 }
-
-.mpv-error-banner a {
-  color: var(--accent);
-  text-decoration: underline;
-}
+.video-banner--empty { color: var(--text-muted); font-size: 13px; }
+.video-banner--empty .hint { font-size: 11px; }
+.video-banner--error { color: var(--accent); font-size: 14px; }
+.video-banner--error a { color: var(--accent); text-decoration: underline; }
 
 /* ── Unified control bar (transport + segment edit/nav + zoom) ───────────── */
 .playback-controls {
@@ -112,29 +139,16 @@ html, body, #root {
   padding: 0 16px;
 }
 
-/* Three groups: edit-tools left, transport centered, segment-nav + zoom right.
-   The flexed left/right groups keep the center transport group visually centered. */
 .pc-group {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.pc-group--left {
-  flex: 1;
-  justify-content: flex-start;
-}
-.pc-group--center {
-  justify-content: center;
-  padding: 0 12px;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-}
-.pc-group--right {
-  flex: 1;
-  justify-content: flex-end;
-}
+.pc-group--left   { flex: 1; justify-content: flex-start; }
+.pc-group--center { justify-content: center; }
+.pc-group--right  { flex: 1; justify-content: flex-end; }
 
-/* ── Timeline zoom slider (in the right control group) ───────────────────── */
+/* ── Timeline zoom slider (right group) ──────────────────────────────────── */
 .timeline-zoom-slider {
   width: 160px;
   accent-color: var(--accent);
@@ -144,7 +158,7 @@ html, body, #root {
 /* ── Floating scroll-step panel ──────────────────────────────────────────── */
 .float-panel {
   position: fixed;
-  z-index: 50;            /* below modal overlays (100) */
+  z-index: 50;
   width: 260px;
   background: var(--bg-toolbar);
   border: 1px solid var(--border);
@@ -159,10 +173,10 @@ html, body, #root {
   padding: 6px 8px 6px 12px;
   border-bottom: 1px solid var(--border);
   cursor: grab;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
 }
 .float-panel-header:active { cursor: grabbing; }
 .float-panel-close {
@@ -173,6 +187,8 @@ html, body, #root {
   font-size: 16px;
   line-height: 1;
   padding: 0 4px;
+  border-radius: 3px;
+  transition: color 160ms var(--ease-out);
 }
 .float-panel-close:hover { color: var(--text-primary); }
 .float-panel-body {
@@ -202,14 +218,19 @@ html, body, #root {
   cursor: pointer;
   font-size: 13px;
   font-family: inherit;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out);
   user-select: none;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
+/* Default-button hover: stay neutral. The previous design lit the border red
+   on hover, making neutral buttons indistinguishable from primary buttons. */
 .btn:hover:not(:disabled) {
   background: var(--bg-hover);
-  border-color: var(--accent);
 }
 
 .btn:active:not(:disabled) {
@@ -221,51 +242,56 @@ html, body, #root {
   cursor: default;
 }
 
+/* Primary: confirmation / terminal actions (Export). Solid red. */
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: oklch(0.98 0.01 60);
+  font-weight: 500;
 }
-
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.15);
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
+/* Danger: destructive (Delete). Outlined so it never looks like Primary. */
 .btn-danger {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
 }
-
 .btn-danger:hover:not(:disabled) {
-  filter: brightness(1.15);
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--danger);
+  color: oklch(0.98 0.01 60);
+  border-color: var(--danger);
 }
 
 .btn-icon {
   padding: 5px 10px;
-  font-size: 15px;
+  font-size: 14px;
 }
 
-.btn-wide { min-width: 64px; }
+.btn-wide { min-width: 72px; }
 
-/* Chrome-bar buttons (Open File, Settings) — quieter dark surface so they
-   sit calmly on the toolbar without competing with the accent Export button. */
+/* Chrome-bar buttons (Open File, Settings) — quietest tier. */
 .btn-chrome {
-  background: #313030;
+  background: var(--bg-chrome);
 }
-
 .btn-chrome:hover:not(:disabled) {
-  background: #3a3a3a;
-  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+.btn-chrome:active:not(:disabled) {
+  background: var(--bg-active);
 }
 
-.btn-chrome:active:not(:disabled) {
-  background: #262626;
+/* Inline SVG icons inside buttons (transport, mute). */
+.btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  display: block;
 }
+.btn-icon-lg svg { width: 16px; height: 16px; }
 
 /* ── Export segment checklist ────────────────────────────────────────────── */
 .segment-checklist {
@@ -304,21 +330,28 @@ html, body, #root {
 
 /* ── Segment selection indicator ─────────────────────────────────────────── */
 .segment-indicator {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
   white-space: nowrap;
   padding: 0 4px;
 }
 
-/* ── Time display ────────────────────────────────────────────────────────── */
+/* ── Time display (single combined "current / total") ────────────────────── */
 .time-display {
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  color: var(--text-muted);
-  min-width: 88px;
-  text-align: center;
+  font-size: 13px;
+  color: var(--text-primary);
   font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.time-display .total {
+  color: var(--text-muted);
+}
+.time-display .sep {
+  color: var(--text-muted);
+  margin: 0 4px;
 }
 
 /* ── Timeline component ──────────────────────────────────────────────────── */
@@ -390,6 +423,13 @@ html, body, #root {
   filter: brightness(1.25);
 }
 
+/* A segment so short that its real width would be below the handle minimum
+   renders as a thin marker rather than a fake-wide block. */
+.segment-block.tiny {
+  border-width: 1px;
+  border-radius: 1px;
+}
+
 .seg-handle {
   position: absolute;
   top: 0;
@@ -401,21 +441,11 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   gap: 2px;
+  transition: background 160ms var(--ease-out);
 }
-
-.seg-handle:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.seg-handle-left {
-  left: 0;
-  border-radius: 2px 0 0 2px;
-}
-
-.seg-handle-right {
-  right: 0;
-  border-radius: 0 2px 2px 0;
-}
+.seg-handle:hover { background: rgba(255, 255, 255, 0.22); }
+.seg-handle-left  { left: 0;  border-radius: 2px 0 0 2px; }
+.seg-handle-right { right: 0; border-radius: 0 2px 2px 0; }
 
 /* Grip lines inside handles */
 .seg-handle::before,
@@ -435,13 +465,14 @@ html, body, #root {
   z-index: 10;
 }
 
+/* Cream-tinted (not pure white) so it reads as warm against the dark chrome. */
 .playhead-head {
   width: 0;
   height: 0;
   margin-left: -9px;
   border-left:  9px solid transparent;
   border-right: 9px solid transparent;
-  border-top:   10px solid #fff;
+  border-top:   10px solid oklch(0.97 0.01 60);
 }
 
 .playhead-line {
@@ -450,14 +481,14 @@ html, body, #root {
   bottom: 0;
   left: 0;
   width: 1px;
-  background: rgba(255, 255, 255, 0.85);
+  background: oklch(0.97 0.01 60 / 0.85);
 }
 
-/* ── Export modal ────────────────────────────────────────────────────────── */
+/* ── Modals ──────────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: oklch(0.10 0.005 25 / 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -471,15 +502,18 @@ html, body, #root {
   padding: 24px;
   width: 460px;
   max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .modal-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .modal-field {
@@ -489,11 +523,11 @@ html, body, #root {
 }
 
 .modal-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .modal-row {
@@ -502,8 +536,8 @@ html, body, #root {
   gap: 8px;
 }
 
-.modal-input {
-  flex: 1;
+.modal-input,
+.modal-select {
   padding: 6px 10px;
   background: var(--bg-deep);
   border: 1px solid var(--border);
@@ -511,11 +545,16 @@ html, body, #root {
   color: var(--text-primary);
   font-size: 13px;
   font-family: inherit;
+  transition: border-color 160ms var(--ease-out);
 }
 
-.modal-input:focus {
+.modal-select { cursor: pointer; padding: 5px 8px; }
+
+.modal-input:focus,
+.modal-select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .modal-path {
@@ -525,13 +564,13 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
 }
 
 .modal-radio-group {
   display: flex;
   gap: 16px;
 }
-
 .modal-radio-group label {
   display: flex;
   align-items: center;
@@ -540,31 +579,41 @@ html, body, #root {
   cursor: pointer;
 }
 
-.modal-select {
-  padding: 5px 8px;
-  background: var(--bg-deep);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-}
-
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding-top: 4px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+/* Helper text under fields. Was inline `style={{}}` in five places. */
+.modal-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+  line-height: 1.4;
+}
+.modal-hint code {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  background: var(--bg-deep);
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 
 .modal-progress {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 16px 0;
+}
+.modal-progress-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-bar-track {
@@ -574,12 +623,11 @@ html, body, #root {
   border-radius: 3px;
   overflow: hidden;
 }
-
 .progress-bar-fill {
   height: 100%;
   background: var(--accent);
   border-radius: 3px;
-  transition: width 0.1s;
+  transition: width 200ms var(--ease-out);
 }
 
 .modal-error {
@@ -589,13 +637,11 @@ html, body, #root {
   border: 1px solid var(--accent-soft-border);
   border-radius: 4px;
   padding: 10px 12px;
+  line-height: 1.4;
 }
 
-/* ── Spinner ─────────────────────────────────────────────────────────────── */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
+/* ── Spinner (kept for non-progress async work) ──────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
   width: 20px;
   height: 20px;
@@ -616,12 +662,24 @@ html, body, #root {
 .settings-slider-bound {
   font-size: 11px;
   color: var(--text-muted);
-  min-width: 20px;
+  min-width: 24px;
   text-align: center;
+  font-family: 'SF Mono', 'Consolas', monospace;
 }
 
 .settings-slider {
   flex: 1;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+/* CRF slider with anchored labels under the track. */
+.crf-marks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  letter-spacing: 0.02em;
 }

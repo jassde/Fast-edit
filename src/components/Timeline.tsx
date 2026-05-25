@@ -173,39 +173,48 @@ export function Timeline({
 
   const segmentBlocks = useMemo(() =>
     segments.map(seg => {
-      const left  = duration > 0 ? timeToPixel(seg.start - effectiveViewStart, w, visibleDuration) : 0
-      const right = duration > 0 ? timeToPixel(seg.end   - effectiveViewStart, w, visibleDuration) : 0
-      const width = Math.max(right - left, MIN_SEGMENT_PX)
+      const left      = duration > 0 ? timeToPixel(seg.start - effectiveViewStart, w, visibleDuration) : 0
+      const right     = duration > 0 ? timeToPixel(seg.end   - effectiveViewStart, w, visibleDuration) : 0
+      const realWidth = right - left
+      const isTiny    = realWidth < MIN_SEGMENT_PX
+      const width     = isTiny ? 2 : realWidth
       const isSelected = seg.id === selectedSegmentId
+
+      // color-mix works with any CSS color (hex / oklch / rgb) — no longer
+      // depends on `seg.color` being a 6-digit hex string.
+      const bg = `color-mix(in oklch, ${seg.color} 28%, transparent)`
 
       return (
         <div
           key={seg.id}
-          className={`segment-block${isSelected ? ' selected' : ''}`}
+          className={`segment-block${isSelected ? ' selected' : ''}${isTiny ? ' tiny' : ''}`}
           style={{
             left,
             width,
-            background: seg.color + '44',
+            background: isTiny ? seg.color : bg,
             borderColor: seg.color,
           }}
           onMouseDown={e => {
             e.stopPropagation()
             onSelectSegment(seg.id)
           }}
-          title={`${formatTime(seg.start)} – ${formatTime(seg.end)}`}
+          title={`${formatTime(seg.start)} to ${formatTime(seg.end)}`}
         >
-          {/* Left (start) handle */}
-          <div
-            className="seg-handle seg-handle-left"
-            onMouseDown={e => startDrag(e, 'start', seg)}
-            title="Drag to adjust start (or press I)"
-          />
-          {/* Right (end) handle */}
-          <div
-            className="seg-handle seg-handle-right"
-            onMouseDown={e => startDrag(e, 'end', seg)}
-            title="Drag to adjust end (or press O)"
-          />
+          {/* Drag handles only when the segment is wide enough to host them. */}
+          {!isTiny && (
+            <>
+              <div
+                className="seg-handle seg-handle-left"
+                onMouseDown={e => startDrag(e, 'start', seg)}
+                title="Drag to adjust start (or press I)"
+              />
+              <div
+                className="seg-handle seg-handle-right"
+                onMouseDown={e => startDrag(e, 'end', seg)}
+                title="Drag to adjust end (or press O)"
+              />
+            </>
+          )}
         </div>
       )
     }),

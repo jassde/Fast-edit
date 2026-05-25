@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import {
   MIN_FRAMES_PER_SCROLL_TICK,
   MAX_FRAMES_PER_SCROLL_TICK,
@@ -56,6 +57,13 @@ export function SettingsModal({
   if (!hwOptions.includes(hwEncoder)) {
     hwOptions.push(hwEncoder)
   }
+
+  // Escape closes the modal.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -129,8 +137,8 @@ export function SettingsModal({
               <option key={opt} value={opt}>{HW_LABELS[opt]}</option>
             ))}
           </select>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-            GPU encoders are 5–10× faster but produce slightly larger files at the same quality.
+          <span className="modal-hint">
+            GPU encoders are 5 to 10 times faster but produce slightly larger files at the same quality.
             Lossless always uses CPU.
           </span>
         </div>

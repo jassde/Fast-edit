@@ -173,6 +173,15 @@ export function ExportModal({
     }
   }, [])
 
+  // Escape closes the modal (except mid-export, where Cancel is the only out).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && s.phase !== 'exporting') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose, s.phase])
+
   const handlePickDir = async () => {
     const dir = await invoke<string | null>('pick_output_dir')
     if (dir) setS(prev => ({ ...prev, outputDir: dir }))
@@ -288,9 +297,9 @@ export function ExportModal({
                 ))}
               </select>
               {showRemuxWarning && (
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                <span className="modal-hint">
                   Stream copy into {CONTAINER_LABEL[s.container]} only works if the source codecs
-                  fit this container — otherwise the export will fail. MKV accepts anything.
+                  fit this container, otherwise the export will fail. MKV accepts anything.
                 </span>
               )}
             </div>
@@ -350,7 +359,7 @@ export function ExportModal({
                   {/* CRF quality slider */}
                   <div style={{ marginTop: 10 }}>
                     <span className="modal-label" style={{ display: 'block', marginBottom: 4 }}>
-                      Quality — CRF {s.crf}
+                      Quality (CRF {s.crf})
                     </span>
                     <div className="settings-slider-row" style={{ marginTop: 0 }}>
                       <span className="settings-slider-bound">0</span>
@@ -366,13 +375,15 @@ export function ExportModal({
                       />
                       <span className="settings-slider-bound">51</span>
                     </div>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>
-                      0 = lossless · 23 = default · 51 = worst (lower is better quality, larger file)
-                    </span>
+                    <div className="crf-marks">
+                      <span>lossless</span>
+                      <span>default</span>
+                      <span>smallest</span>
+                    </div>
                   </div>
 
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, display: 'block' }}>
-                    Encoder: {hwEncoderLabel(hwEncoder, s.crf)} — change in Settings
+                  <span className="modal-hint">
+                    Encoder: {hwEncoderLabel(hwEncoder, s.crf)}. Change in Settings.
                   </span>
                 </>
               )}
@@ -388,7 +399,7 @@ export function ExportModal({
                 onChange={e => setS(p => ({ ...p, filenamePattern: e.target.value }))}
                 placeholder="{original}_segment_{n}"
               />
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              <span className="modal-hint">
                 Preview: <code>{previewName}</code>
               </span>
             </div>
@@ -410,11 +421,11 @@ export function ExportModal({
         {/* ── Exporting phase ── */}
         {s.phase === 'exporting' && (
           <div className="modal-progress">
-            <div className="spinner" />
-            <span style={{ color: 'var(--text-muted)' }}>
-              Exporting… {Math.round(s.progress)}%
-            </span>
-            <div className="progress-bar-track" style={{ width: '100%' }}>
+            <div className="modal-progress-row">
+              <span>Exporting…</span>
+              <span>{Math.round(s.progress)}%</span>
+            </div>
+            <div className="progress-bar-track">
               <div className="progress-bar-fill" style={{ width: `${s.progress}%` }} />
             </div>
           </div>

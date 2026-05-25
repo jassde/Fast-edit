@@ -41,7 +41,7 @@ export default function App() {
     actions.setFilePath(path)
   }, [actions])
 
-  useFileDrop(handleFileDrop)
+  const isDragOver = useFileDrop(handleFileDrop)
 
   // Global keyboard shortcuts
   useKeyboard(state, actions, playback)
@@ -147,16 +147,20 @@ export default function App() {
       {/* Transparent slot — libmpv renders behind the WebView, constrained to
           this rect by setVideoMarginRatio (see useMpv.ts). The banners below
           provide an opaque background when no file is loaded or mpv errored. */}
-      <div className="video-panel" id="video-panel" ref={videoPanelRef}>
+      <div
+        className={`video-panel${isDragOver ? ' drag-over' : ''}`}
+        id="video-panel"
+        ref={videoPanelRef}
+      >
         {state.mpvError && (
-          <div className="mpv-error-banner">
+          <div className="video-banner video-banner--error">
             <span style={{ whiteSpace: 'pre-wrap' }}>{state.mpvError}</span>
           </div>
         )}
         {!state.filePath && !state.mpvError && (
-          <div className="mpv-error-banner" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+          <div className="video-banner video-banner--empty">
             <span>Drop a video file here, or use Open File</span>
-            <span style={{ fontSize: 11 }}>Supported: MP4, WebM, MKV, MOV</span>
+            <span className="hint">Supported: MP4, WebM, MKV, MOV</span>
           </div>
         )}
       </div>
