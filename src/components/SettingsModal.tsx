@@ -14,11 +14,9 @@ type SettingsModalProps = {
   secondsPerShiftScrollTick: number
   hwEncoder:                 HwEncoder
   hwSupport:                 HwSupport
-  showScrollPanel:           boolean
   onChangeFrames:            (n: number) => void
   onChangeSeconds:           (n: number) => void
   onChangeHwEncoder:         (e: HwEncoder) => void
-  onToggleScrollPanel:       (b: boolean) => void
   onClose:                   () => void
 }
 
@@ -37,11 +35,9 @@ export function SettingsModal({
   secondsPerShiftScrollTick,
   hwEncoder,
   hwSupport,
-  showScrollPanel,
   onChangeFrames,
   onChangeSeconds,
   onChangeHwEncoder,
-  onToggleScrollPanel,
   onClose,
 }: SettingsModalProps) {
   // Always offer Auto and Software; gate vendor-specific options on whether
@@ -109,18 +105,6 @@ export function SettingsModal({
             />
             <span className="settings-slider-bound">{MAX_SECONDS_PER_SHIFT_SCROLL_TICK}</span>
           </div>
-        </div>
-
-        {/* Floating scroll-step panel toggle */}
-        <div className="modal-field">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={showScrollPanel}
-              onChange={e => onToggleScrollPanel(e.target.checked)}
-            />
-            Show floating scroll-step panel while editing
-          </label>
         </div>
 
         {/* Hardware encoder */}
