@@ -122,9 +122,7 @@ export default function App() {
     let unlisten: (() => void) | null = null
     let aborted = false
 
-    listen('scroll-panel-close', async () => {
-      const panelWin = await WebviewWindow.getByLabel('scroll-panel')
-      panelWin?.close()
+    listen('scroll-panel-close', () => {
       actions.setShowScrollPanel(false)
     }).then(ul => {
       if (aborted) ul()
@@ -182,7 +180,8 @@ export default function App() {
         console.error('Scroll-panel window error:', e)
       })
 
-      // If the user closes the window via OS (e.g. Alt+F4), sync main state.
+      // Syncs state when user closes via OS (Alt+F4). If the window was already
+      // closed programmatically, the lifecycle effect's win?.close() is a no-op.
       win.once('tauri://destroyed', () => {
         actions.setShowScrollPanel(false)
       })
@@ -419,7 +418,6 @@ export default function App() {
           onClose={actions.closeSettingsModal}
         />
       )}
-
 
     </div>
   )
