@@ -204,7 +204,7 @@ export default function Downloader() {
               {isDownloading ? 'Downloading…' : 'Download'}
             </button>
             <button
-              className="btn btn-primary"
+              className="btn"
               onClick={handleLoadInEditor}
               disabled={!isDone || !downloadedPath}
             >
@@ -221,12 +221,12 @@ export default function Downloader() {
           </button>
         </div>
 
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+        <div className="dl-footer-hint">
           <span className="modal-hint">
             Videos download to the <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Temp</strong> folder.
             Clean up after downloading to save disk space.
             {tempDir && (
-              <><br /><span style={{ fontFamily: "'SF Mono', Consolas, monospace", fontSize: 11, opacity: 0.7 }}>{tempDir}</span></>
+              <><br /><span style={{ fontFamily: "'SF Mono', Consolas, monospace", fontSize: 11, opacity: 0.6 }}>{tempDir}</span></>
             )}
           </span>
         </div>

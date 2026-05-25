@@ -80,10 +80,10 @@ export default function App() {
     const win = new WebviewWindow('downloader', {
       url: 'index.html#downloader',
       title: 'Video Downloader',
-      width: 660,
-      height: 620,
-      minWidth: 500,
-      minHeight: 500,
+      width: 600,
+      height: 560,
+      minWidth: 460,
+      minHeight: 440,
       resizable: true,
       center: true,
     })
