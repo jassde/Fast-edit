@@ -1,4 +1,5 @@
 mod ffmpeg;
+mod ytdlp;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -25,12 +26,24 @@ pub fn run() {
                 guard.ffmpeg_path = Some(path);
                 guard.hw_support  = hw_support;
             }
+
+            // Initialise yt-dlp state: loads persisted exe path and resolves the Temp dir.
+            let ytdlp_state = ytdlp::init_state(&app.handle());
+            app.manage(Mutex::new(ytdlp_state));
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             ffmpeg::export_segments,
             ffmpeg::pick_output_dir,
             ffmpeg::get_hw_support,
+            ytdlp::get_ytdlp_config,
+            ytdlp::save_ytdlp_path,
+            ytdlp::fetch_formats,
+            ytdlp::download_video,
+            ytdlp::get_temp_dir,
+            ytdlp::clear_temp_dir,
+            ytdlp::focus_main_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

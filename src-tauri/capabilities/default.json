@@ -7,6 +7,7 @@
     "core:default",
     "opener:default",
     "dialog:default",
-    "libmpv:default"
+    "libmpv:default",
+    "core:webview:allow-create-webview-window"
   ]
 }

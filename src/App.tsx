@@ -2,6 +2,8 @@ import './App.css'
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 import { useAppState } from './hooks/useAppState'
 import { useMpv } from './hooks/useMpv'
@@ -59,6 +61,36 @@ export default function App() {
       actions.setFilePath(selected)
     }
   }, [actions])
+
+  // Cross-window: load a video file emitted by the downloader window
+  useEffect(() => {
+    const unlisten = listen<string>('load-video-file', (event) => {
+      actions.setFilePath(event.payload)
+    })
+    return () => { unlisten.then(fn => fn()) }
+  }, [actions])
+
+  // Open the downloader as a separate Tauri window; focus it if already open
+  const openDownloaderWindow = useCallback(async () => {
+    const existing = await WebviewWindow.getByLabel('downloader')
+    if (existing) {
+      existing.setFocus()
+      return
+    }
+    const win = new WebviewWindow('downloader', {
+      url: 'index.html#downloader',
+      title: 'Video Downloader',
+      width: 660,
+      height: 620,
+      minWidth: 500,
+      minHeight: 500,
+      resizable: true,
+      center: true,
+    })
+    win.once('tauri://error', (e) => {
+      console.error('Downloader window error:', e)
+    })
+  }, [])
 
   // Seek: update both mpv and local playhead state
   const handleSeek = useCallback((time: number) => {
@@ -128,6 +160,17 @@ export default function App() {
         <button
           className="btn btn-chrome"
           style={{ marginLeft: 'auto' }}
+          onClick={openDownloaderWindow}
+          title="Download video with yt-dlp"
+          aria-label="Download video"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 12l-5-5h3V2h4v5h3L8 12z"/>
+            <rect x="2" y="13" width="12" height="1.5" rx="0.75"/>
+          </svg>
+        </button>
+        <button
+          className="btn btn-chrome"
           onClick={actions.openSettingsModal}
           title="Settings"
         >

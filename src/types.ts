@@ -43,3 +43,23 @@ export type ExportParams = {
 
 // Tauri event payload — field names must match the Rust struct fields exactly.
 export type ExportProgressPayload = { percent: number }
+
+// yt-dlp downloader types
+export type VideoFormat = {
+  formatId: string       // e.g. "1080p", "720p", "audio"
+  label: string          // human-readable, e.g. "1080p Full HD (1080p)"
+  ytdlpSelector: string  // yt-dlp format selector string
+  hasVideo: boolean
+  hasAudio: boolean
+}
+
+export type YtdlpProgress = {
+  percent: number  // 0–100
+  speed: string    // e.g. "1.23MiB/s"
+  eta: string      // e.g. "00:45"
+}
+
+export type YtdlpConfig = {
+  ytdlpPath: string  // absolute path to yt-dlp.exe; empty string if not set
+  tempDir: string    // absolute path to the Temp download folder
+}
