@@ -684,3 +684,40 @@ html, body, #root {
   font-family: 'SF Mono', 'Consolas', monospace;
   letter-spacing: 0.02em;
 }
+
+/* ─── Scroll-panel window ─────────────────────────────────────────────────── */
+/* These rules are scoped to .scroll-panel-window (set on <html> in main.tsx)
+   to avoid leaking into the transparent main window. */
+
+.scroll-panel-window,
+.scroll-panel-window body,
+.scroll-panel-window #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-toolbar);
+}
+
+.scroll-panel-window .scroll-panel-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* The header doubles as the OS drag region (data-tauri-drag-region). */
+.scroll-panel-window .float-panel-header {
+  cursor: grab;
+}
+
+.scroll-panel-window .float-panel-body {
+  flex: 1;
+  overflow: hidden;
+}
