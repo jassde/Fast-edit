@@ -8,7 +8,9 @@ import {
   MAX_SECONDS_PER_SHIFT_SCROLL_TICK,
   DEFAULT_FRAMES_PER_SCROLL_TICK,
   DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK,
+  SETTINGS_STORAGE_KEY,
 } from '../constants'
+import { clamp } from '../utils'
 
 // Mirror the persisted settings shape from useAppState.
 type PersistedSettings = {
@@ -18,12 +20,14 @@ type PersistedSettings = {
 
 function readFromStorage(): { frames: number; seconds: number } {
   try {
-    const raw = localStorage.getItem('video-trimmer-settings')
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
     if (!raw) return { frames: DEFAULT_FRAMES_PER_SCROLL_TICK, seconds: DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK }
     const parsed: PersistedSettings = JSON.parse(raw)
+    const rawFrames  = parsed.framesPerScrollTick       ?? DEFAULT_FRAMES_PER_SCROLL_TICK
+    const rawSeconds = parsed.secondsPerShiftScrollTick ?? DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK
     return {
-      frames:  parsed.framesPerScrollTick       ?? DEFAULT_FRAMES_PER_SCROLL_TICK,
-      seconds: parsed.secondsPerShiftScrollTick ?? DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK,
+      frames:  isNaN(rawFrames)  ? DEFAULT_FRAMES_PER_SCROLL_TICK  : clamp(rawFrames,  MIN_FRAMES_PER_SCROLL_TICK,  MAX_FRAMES_PER_SCROLL_TICK),
+      seconds: isNaN(rawSeconds) ? DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK : clamp(rawSeconds, MIN_SECONDS_PER_SHIFT_SCROLL_TICK, MAX_SECONDS_PER_SHIFT_SCROLL_TICK),
     }
   } catch {
     return { frames: DEFAULT_FRAMES_PER_SCROLL_TICK, seconds: DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK }
@@ -41,9 +45,8 @@ type ScrollSettingsChangePayload = {
 }
 
 export function ScrollPanelApp() {
-  const initial = readFromStorage()
-  const [frames,  setFrames]  = useState(initial.frames)
-  const [seconds, setSeconds] = useState(initial.seconds)
+  const [frames,  setFrames]  = useState(() => readFromStorage().frames)
+  const [seconds, setSeconds] = useState(() => readFromStorage().seconds)
 
   // Sync incoming state from the main window.
   useEffect(() => {
@@ -76,16 +79,16 @@ export function ScrollPanelApp() {
 
   const handleFramesChange = (value: number) => {
     setFrames(value)
-    emit<ScrollSettingsChangePayload>('scroll-settings-change', { kind: 'frames', value })
+    emit<ScrollSettingsChangePayload>('scroll-settings-change', { kind: 'frames', value }).catch(console.error)
   }
 
   const handleSecondsChange = (value: number) => {
     setSeconds(value)
-    emit<ScrollSettingsChangePayload>('scroll-settings-change', { kind: 'seconds', value })
+    emit<ScrollSettingsChangePayload>('scroll-settings-change', { kind: 'seconds', value }).catch(console.error)
   }
 
   const handleClose = () => {
-    emit('scroll-panel-close', null)
+    emit('scroll-panel-close', null).catch(console.error)
   }
 
   return (
