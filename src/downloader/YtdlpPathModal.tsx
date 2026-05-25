@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 
 type Props = {
   currentPath: string
@@ -9,8 +10,8 @@ type Props = {
 }
 
 export default function YtdlpPathModal({ currentPath, onSave, onClose }: Props) {
-  const [path, setPath] = useState(currentPath)
-  const [error, setError] = useState('')
+  const [path, setPath]     = useState(currentPath)
+  const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
 
   async function browseForExe() {
@@ -42,125 +43,66 @@ export default function YtdlpPathModal({ currentPath, onSave, onClose }: Props) 
   }
 
   return (
-    <div
-      onClick={handleOverlayClick}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 100,
-      }}
-    >
-      <div style={{
-        background: '#1e1e1e',
-        border: '1px solid #333',
-        borderRadius: 10,
-        width: 480,
-        padding: 24,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 18,
-      }}>
-        {/* Header */}
+    <div className="modal-overlay" onClick={handleOverlayClick}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="yt-dlp Path">
+
+        {/* Title row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>yt-dlp Path</h2>
+          <div className="modal-title">yt-dlp Path</div>
           <button
+            className="btn btn-chrome btn-icon"
             onClick={onClose}
             aria-label="Close"
-            style={{
-              background: 'none', border: 'none', color: '#aaa',
-              fontSize: 18, cursor: 'pointer', padding: '2px 6px',
-            }}
-          >✕</button>
+            style={{ fontSize: 16, lineHeight: 1 }}
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Info banner */}
-        <div style={{
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 8,
-          padding: '12px 14px',
-          fontSize: 13,
-          lineHeight: 1.65,
-          color: '#aaa',
-        }}>
-          <strong style={{ color: '#e0e0e0' }}>yt-dlp must be installed</strong> to download
-          videos. It&apos;s recommended to keep it up to date for best site compatibility.
-          <br />
+        {/* Info box */}
+        <div className="dl-info-box">
+          <strong>yt-dlp must be installed</strong> to download videos.
+          Keep it up to date for best site compatibility.
+          {' '}
           <a
             href="#"
-            style={{ color: '#4d9fff', textDecoration: 'none' }}
-            onClick={(e) => {
-              e.preventDefault()
-              invoke('plugin:opener|open_url', { url: 'https://github.com/yt-dlp/yt-dlp/releases/latest' })
-            }}
+            onClick={e => { e.preventDefault(); openUrl('https://github.com/yt-dlp/yt-dlp/releases/latest') }}
           >
             github.com/yt-dlp/yt-dlp ↗
           </a>
         </div>
 
-        {/* Path picker */}
-        <div>
-          <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>
-            Path to yt-dlp.exe
-          </label>
-          <div style={{ display: 'flex', gap: 8 }}>
+        {/* Path field */}
+        <div className="modal-field">
+          <span className="modal-label">Path to yt-dlp.exe</span>
+          <div className="modal-row">
             <input
+              className="modal-input"
               type="text"
               value={path}
-              onChange={(e) => setPath(e.target.value)}
+              onChange={e => setPath(e.target.value)}
               placeholder="C:\tools\yt-dlp.exe"
-              style={{
-                flex: 1, minWidth: 0,
-                background: '#2a2a2a', border: '1px solid #3a3a3a',
-                borderRadius: 6, color: '#e0e0e0',
-                padding: '7px 10px', fontSize: 13, outline: 'none',
-              }}
+              style={{ flex: 1, minWidth: 0 }}
             />
-            <button
-              onClick={browseForExe}
-              style={{
-                background: '#2a2a2a', border: '1px solid #3a3a3a',
-                borderRadius: 6, color: '#e0e0e0',
-                padding: '7px 14px', cursor: 'pointer', fontSize: 13,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Browse…
-            </button>
+            <button className="btn" onClick={browseForExe}>Browse…</button>
           </div>
         </div>
 
-        {error && (
-          <p style={{ color: '#f87171', fontSize: 13, margin: 0 }}>{error}</p>
-        )}
+        {/* Error */}
+        {error && <div className="modal-error">{error}</div>}
 
-        {/* Footer buttons */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        {/* Footer */}
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose}>Cancel</button>
           <button
-            onClick={onClose}
-            style={{
-              background: '#2a2a2a', border: '1px solid #3a3a3a',
-              borderRadius: 6, color: '#e0e0e0',
-              padding: '7px 18px', cursor: 'pointer', fontSize: 13,
-            }}
-          >
-            Cancel
-          </button>
-          <button
+            className="btn btn-primary"
             onClick={handleSave}
             disabled={saving}
-            style={{
-              background: saving ? '#1a3a6a' : '#2563eb',
-              border: '1px solid transparent',
-              borderRadius: 6, color: '#fff',
-              padding: '7px 18px', cursor: saving ? 'not-allowed' : 'pointer',
-              fontSize: 13, opacity: saving ? 0.7 : 1,
-            }}
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
+
       </div>
     </div>
   )
