@@ -52,14 +52,13 @@ export default function YtdlpPathModal({ currentPath, onSave, onClose }: Props) 
     <div className="modal-overlay" onClick={handleOverlayClick}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="yt-dlp Path">
 
-        {/* Title row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Header with close button */}
+        <div className="modal-header">
           <div className="modal-title">yt-dlp Path</div>
           <button
-            className="btn btn-chrome btn-icon"
+            className="modal-close-btn"
             onClick={onClose}
             aria-label="Close"
-            style={{ fontSize: 16, lineHeight: 1 }}
           >
             ✕
           </button>
@@ -94,10 +93,10 @@ export default function YtdlpPathModal({ currentPath, onSave, onClose }: Props) 
           </div>
         </div>
 
-        {/* Error */}
+        {/* Error display */}
         {error && <div className="modal-error">{error}</div>}
 
-        {/* Footer */}
+        {/* Footer actions */}
         <div className="modal-footer">
           <button className="btn" onClick={onClose}>Cancel</button>
           <button

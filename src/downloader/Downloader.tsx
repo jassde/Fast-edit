@@ -90,28 +90,35 @@ export default function Downloader() {
   const isDownloading = phase === 'downloading'
   const isDone        = phase === 'done'
   const isFetching    = phase === 'fetching'
+  const isYtdlpMissing = !ytdlpPath
 
-  // When yt-dlp isn't configured yet, surface the path button as a call-to-action
-  // using btn-danger (outlined red) so the missing dependency is unmissable.
-  const pathBtnClass = ytdlpPath ? 'btn btn-chrome' : 'btn btn-danger'
+  const downloadDisabled = !selectedFormat || isDownloading || !url.trim() || isYtdlpMissing
+
+  let downloadTitle = ''
+  if (isYtdlpMissing) downloadTitle = 'yt-dlp path not configured — click "yt-dlp Path" button above'
+  else if (!selectedFormat) downloadTitle = 'Select a video format first'
+  else if (!url.trim()) downloadTitle = 'Enter a video URL'
+  else if (isDownloading) downloadTitle = 'Download in progress'
+
+  const pathBtnClass = isYtdlpMissing ? 'btn btn-danger' : 'btn btn-chrome'
 
   return (
     <div className="dl-window">
 
-      {/* ── Title bar ── */}
+      {/* Title bar */}
       <div className="top-bar">
-        <span className="app-title">Video Downloader</span>
+        <span className="app-title">🎬 Video Downloader</span>
         <button
           className={pathBtnClass}
           style={{ marginLeft: 'auto' }}
           onClick={() => setShowPathModal(true)}
-          title={ytdlpPath ? `yt-dlp: ${ytdlpPath}` : 'yt-dlp is not configured — click to set path'}
+          title={ytdlpPath ? `yt-dlp: ${ytdlpPath}` : '⚠️ yt-dlp is missing — set path to enable downloads'}
         >
-          yt-dlp Path{!ytdlpPath ? ' !' : ''}
+          yt-dlp Path{isYtdlpMissing ? ' ⚠️' : ''}
         </button>
       </div>
 
-      {/* ── Body ── */}
+      {/* Body */}
       <div className="dl-body">
 
         {/* URL field */}
@@ -136,6 +143,13 @@ export default function Downloader() {
             </button>
           </div>
         </div>
+
+        {/* Missing yt-dlp warning banner */}
+        {isYtdlpMissing && phase !== 'downloading' && (
+          <div className="warning-banner">
+            ⚠️ yt-dlp is not configured. Click the <strong>“yt-dlp Path”</strong> button above to select the executable.
+          </div>
+        )}
 
         {/* Format picker */}
         {formats.length > 0 && (
@@ -168,7 +182,7 @@ export default function Downloader() {
               <div className="progress-bar-fill" style={{ width: `${progress.percent}%` }} />
             </div>
             <div className="dl-progress-meta">
-              <span>Downloading…</span>
+              <span>📥 Downloading…</span>
               <span>
                 {progress.percent.toFixed(1)}%
                 {progress.speed && ` · ${progress.speed}`}
@@ -180,26 +194,27 @@ export default function Downloader() {
 
         {/* Done state */}
         {isDone && (
-          <p className="dl-done">
-            Download complete — ready to load into editor.
-          </p>
+          <div className="dl-done">
+            ✅ Download complete — ready to load into editor.
+          </div>
         )}
 
-        {/* Error */}
+        {/* Error message */}
         {phase === 'error' && (
           <div className="modal-error">{errorMsg}</div>
         )}
 
       </div>
 
-      {/* ── Footer ── */}
+      {/* Footer */}
       <div className="dl-footer">
         <div className="dl-footer-actions">
           <div className="dl-footer-actions-left">
             <button
               className="btn btn-primary"
               onClick={handleDownload}
-              disabled={!selectedFormat || isDownloading || !url.trim() || !ytdlpPath}
+              disabled={downloadDisabled}
+              title={downloadTitle}
             >
               {isDownloading ? 'Downloading…' : 'Download'}
             </button>
@@ -207,6 +222,7 @@ export default function Downloader() {
               className="btn"
               onClick={handleLoadInEditor}
               disabled={!isDone || !downloadedPath}
+              title={!isDone ? 'Complete a download first' : 'Load into main editor'}
             >
               Load into Editor
             </button>
@@ -215,18 +231,19 @@ export default function Downloader() {
             className="btn btn-danger"
             onClick={handleClearTemp}
             disabled={clearingTemp}
-            title={tempDir ? `Delete all files in: ${tempDir}` : 'Delete Temp folder contents'}
+            title={tempDir ? `Delete all files in: ${tempDir}` : 'Delete temporary files'}
           >
-            {clearingTemp ? 'Clearing…' : 'Delete Temp'}
+            {clearingTemp ? 'Clearing…' : '🗑 Delete Temp'}
           </button>
         </div>
 
         <div className="dl-footer-hint">
           <span className="modal-hint">
-            Videos download to the <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Temp</strong> folder.
-            Clean up after downloading to save disk space.
+            Videos download to the <strong>Temp</strong> folder. Clean up regularly to save space.
             {tempDir && (
-              <><br /><span style={{ fontFamily: "'SF Mono', Consolas, monospace", fontSize: 11, opacity: 0.6 }}>{tempDir}</span></>
+              <div className="temp-path">
+                📁 {tempDir}
+              </div>
             )}
           </span>
         </div>

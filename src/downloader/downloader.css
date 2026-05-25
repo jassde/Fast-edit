@@ -1,28 +1,106 @@
-/* ── Downloader window overrides ─────────────────────────────────────────────
-   App.css sets background: transparent so libmpv can paint behind the WebView.
-   This window has no mpv layer — it needs an opaque surface.               */
+/* ── Downloader & Modal styles ─────────────────────────────────────────────
+   Improved spacing, typography, interactions, and visual hierarchy        */
+
+/* =========================================================================
+   Global / window
+   ========================================================================= */
 html, body, #root {
   background: var(--bg-deep) !important;
   overflow: hidden;
 }
 
-/* ── Window shell ────────────────────────────────────────────────────────── */
 .dl-window {
   display: flex;
   flex-direction: column;
   height: 100%;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
 }
 
+/* =========================================================================
+   Title bar (top-bar)
+   ========================================================================= */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--text-primary);
+}
+
+/* =========================================================================
+   Main body
+   ========================================================================= */
 .dl-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 28px;
 }
 
-/* ── URL row ─────────────────────────────────────────────────────────────── */
+/* =========================================================================
+   Form fields (consistent across downloader & modal)
+   ========================================================================= */
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.modal-input {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  transition: border 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft-bg);
+}
+
+.modal-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.modal-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.modal-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* URL row special */
 .dl-url-row {
   display: flex;
   gap: 8px;
@@ -33,109 +111,352 @@ html, body, #root {
   min-width: 0;
 }
 
-/* ── Format picker ───────────────────────────────────────────────────────── */
+/* =========================================================================
+   Format list (radio cards)
+   ========================================================================= */
 .dl-format-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .dl-format-option {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 12px;
+  padding: 10px 14px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 14px;
+  font-weight: 450;
   color: var(--text-primary);
-  font-family: inherit;
-  text-align: left;
-  user-select: none;
-  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out);
-}
-.dl-format-option:hover {
-  background: var(--bg-hover);
-}
-.dl-format-option.is-selected {
-  background: var(--accent-soft-bg);
-  border-color: var(--accent-soft-border);
-}
-.dl-format-option input[type="radio"] {
-  accent-color: var(--accent);
-  flex-shrink: 0;
-  cursor: pointer;
-  margin: 0;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 100ms ease;
 }
 
-/* ── Progress ────────────────────────────────────────────────────────────── */
+.dl-format-option:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-soft-border);
+}
+
+.dl-format-option.is-selected {
+  background: var(--accent-soft-bg);
+  border-color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.dl-format-option input[type="radio"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* =========================================================================
+   Progress bar
+   ========================================================================= */
+.progress-bar-track {
+  background: var(--bg-active);
+  border-radius: 20px;
+  height: 6px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 70%, white));
+  width: 0%;
+  height: 100%;
+  border-radius: 20px;
+  transition: width 300ms ease-out;
+  animation: progressPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes progressPulse {
+  0% { opacity: 0.9; }
+  50% { opacity: 1; }
+  100% { opacity: 0.9; }
+}
+
 .dl-progress-meta {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-  margin-top: 6px;
+  margin-top: 8px;
+  font-weight: 450;
 }
 
-/* ── Done indicator ──────────────────────────────────────────────────────── */
+/* =========================================================================
+   Done & info boxes
+   ========================================================================= */
 .dl-done {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
   background: var(--accent-soft-bg);
   border: 1px solid var(--accent-soft-border);
-  border-radius: 5px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-/* ── Info box (neutral, not an error) ────────────────────────────────────── */
 .dl-info-box {
   background: var(--bg-active);
   border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 10px 12px;
-  font-size: 12px;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 13px;
   color: var(--text-muted);
   line-height: 1.55;
 }
+
 .dl-info-box strong {
   color: var(--text-primary);
-  font-weight: 500;
+  font-weight: 600;
 }
+
 .dl-info-box a {
   color: var(--accent);
   text-decoration: none;
 }
+
 .dl-info-box a:hover {
   text-decoration: underline;
 }
 
-/* ── Footer bar ──────────────────────────────────────────────────────────── */
+/* Warning banner (missing yt-dlp) */
+.warning-banner {
+  background: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+  border-left: 4px solid var(--accent-warning);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+/* =========================================================================
+   Footer bar
+   ========================================================================= */
 .dl-footer {
   background: var(--bg-toolbar);
   border-top: 1px solid var(--border);
-  padding: 12px 20px 14px;
+  padding: 16px 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   flex-shrink: 0;
 }
+
 .dl-footer-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
+
 .dl-footer-actions-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
+
 .dl-footer-hint {
   border-top: 1px solid var(--border);
-  padding-top: 9px;
+  padding-top: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.temp-path {
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-size: 11px;
+  background: var(--bg-deep);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+/* =========================================================================
+   Buttons (consistent)
+   ========================================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 160ms var(--ease-out);
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent-soft-border);
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, black);
+  border-color: color-mix(in srgb, var(--accent) 85%, black);
+}
+
+.btn-danger {
+  border-color: var(--accent-warning);
+  color: var(--accent-warning);
+  background: transparent;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+}
+
+.btn-chrome {
+  background: var(--bg-toolbar);
+  border-color: var(--border);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-icon {
+  padding: 6px;
+  aspect-ratio: 1;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* =========================================================================
+   Error & feedback
+   ========================================================================= */
+.modal-error {
+  background: color-mix(in srgb, var(--accent-warning) 8%, transparent);
+  border-left: 3px solid var(--accent-warning);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+/* =========================================================================
+   Modal specific (overlay, card)
+   ========================================================================= */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: color-mix(in srgb, black 50%, transparent);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal {
+  background: var(--bg-deep);
+  border-radius: 24px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px;
+  line-height: 1;
+  border-radius: 8px;
+  transition: all 160ms;
+}
+
+.modal-close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* Responsive touch-ups */
+@media (max-width: 550px) {
+  .dl-body {
+    padding: 16px;
+    gap: 20px;
+  }
+  .dl-footer-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dl-footer-actions-left {
+    justify-content: stretch;
+  }
+  .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .modal {
+    padding: 20px;
+  }
 }
