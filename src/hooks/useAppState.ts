@@ -179,7 +179,7 @@ export function useAppState(): [AppState, AppActions] {
 
       // Bounds: left neighbor's end → right neighbor's start (or video edges)
       const rightNeighbor = sorted.find(seg => seg.start > pos)
-      const leftNeighbor  = [...sorted].reverse().find(seg => seg.end <= pos)
+      const leftNeighbor  = sorted.findLast(seg => seg.end <= pos)
       const minStart = leftNeighbor  ? leftNeighbor.end   : 0
       const maxEnd   = rightNeighbor ? rightNeighbor.start : s.duration
 

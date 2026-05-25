@@ -62,12 +62,22 @@ export default function App() {
     }
   }, [actions])
 
-  // Cross-window: load a video file emitted by the downloader window
+  // Cross-window: load a video file emitted by the downloader window.
+  // Uses the aborted-flag pattern (mirrors useMpv) to handle the StrictMode
+  // double-mount race where the component unmounts before listen() resolves.
   useEffect(() => {
-    const unlisten = listen<string>('load-video-file', (event) => {
+    let aborted = false
+    let unlisten: (() => void) | null = null
+    listen<string>('load-video-file', (event) => {
       actions.setFilePath(event.payload)
+    }).then(ul => {
+      if (aborted) ul()
+      else unlisten = ul
     })
-    return () => { unlisten.then(fn => fn()) }
+    return () => {
+      aborted = true
+      unlisten?.()
+    }
   }, [actions])
 
   // Open the downloader as a separate Tauri window; focus it if already open
@@ -122,31 +132,35 @@ export default function App() {
   // centered on the playhead.
   const [timelineZoom, setTimelineZoom] = useState<number>(1)
 
+  // Single sorted copy shared by the segment indicator and handleSelectNext.
+  const sortedSegments = useMemo(
+    () => [...state.segments].sort((a, b) => a.start - b.start),
+    [state.segments],
+  )
+
   // Selected segment's 1-based position in start order + total count, for the
-  // segment indicator. Same sort key as handleSelectNext so they agree.
+  // segment indicator.
   const { selectedSegmentNumber, segmentCount } = useMemo(() => {
-    const sorted = [...state.segments].sort((a, b) => a.start - b.start)
     const idx = state.selectedSegmentId
-      ? sorted.findIndex(seg => seg.id === state.selectedSegmentId)
+      ? sortedSegments.findIndex(seg => seg.id === state.selectedSegmentId)
       : -1
     return {
       selectedSegmentNumber: idx >= 0 ? idx + 1 : null,
-      segmentCount: sorted.length,
+      segmentCount: sortedSegments.length,
     }
-  }, [state.segments, state.selectedSegmentId])
+  }, [sortedSegments, state.selectedSegmentId])
 
   // Next ▸ : select the next segment in start order (wrap last→first; first
   // when nothing selected) AND move the playhead to its start.
   const handleSelectNext = useCallback(() => {
-    if (state.segments.length === 0) return
-    const sorted = [...state.segments].sort((a, b) => a.start - b.start)
+    if (sortedSegments.length === 0) return
     const curr = state.selectedSegmentId
-      ? sorted.findIndex(seg => seg.id === state.selectedSegmentId)
+      ? sortedSegments.findIndex(seg => seg.id === state.selectedSegmentId)
       : -1
-    const next = sorted[curr === -1 ? 0 : (curr + 1) % sorted.length]
+    const next = sortedSegments[curr === -1 ? 0 : (curr + 1) % sortedSegments.length]
     actions.selectSegment(next.id)
     handleSeek(next.start)
-  }, [state.segments, state.selectedSegmentId, actions, handleSeek])
+  }, [sortedSegments, state.selectedSegmentId, actions, handleSeek])
 
   return (
     <div className="app-shell">

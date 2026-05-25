@@ -51,10 +51,18 @@ export function pickColor(existingColors: readonly string[]): string {
   )
 }
 
+// Characters Windows forbids in filenames + path separators. Mirrors the Rust
+// `ILLEGAL_FILENAME_CHARS` constant in ffmpeg.rs so the preview matches the
+// actual on-disk filename produced by the backend.
+const ILLEGAL_FILENAME_RE = /[/\\:|<>?*"\x00-\x1f]/g
+
 /**
- * Expand a filename pattern.
+ * Expand a filename pattern and sanitize the result the same way the Rust
+ * backend does, so the preview in ExportModal exactly matches what lands on
+ * disk. Returns `"output"` (+ ext) if the pattern expands to an empty or
+ * reserved name rather than throwing.
+ *
  * Substitutions: {original} → stem, {n} → 1-based index (string)
- * Returns the full filename including extension.
  */
 export function expandFilename(
   pattern: string,
@@ -62,9 +70,15 @@ export function expandFilename(
   index: number,
   ext: string,
 ): string {
-  return (
-    pattern
-      .replace(/\{original\}/g, originalStem)
-      .replace(/\{n\}/g, String(index)) + ext
-  )
+  const raw = pattern
+    .replace(/\{original\}/g, originalStem)
+    .replace(/\{n\}/g, String(index))
+
+  const sanitized = raw.replace(ILLEGAL_FILENAME_RE, '_')
+  const trimmed = sanitized.trim().replace(/\.+$/, '')
+
+  if (!trimmed || trimmed === '.' || trimmed === '..') {
+    return 'output' + ext
+  }
+  return trimmed + ext
 }

@@ -168,12 +168,12 @@ export function useMpv(
   }, [initialized, filePath])
 
   // ── Playback command helpers (stable identities) ─────────────────────
-  const play          = useCallback(() => { setProperty('pause', false).catch(console.warn) }, [])
-  const pause         = useCallback(() => { setProperty('pause', true ).catch(console.warn) }, [])
-  const seek          = useCallback((pos: number) => { command('seek', [pos, 'absolute']).catch(console.warn) }, [])
-  const frameStep     = useCallback(() => { command('frame-step').catch(console.warn) }, [])
-  const frameBackStep = useCallback(() => { command('frame-back-step').catch(console.warn) }, [])
-  const setMute       = useCallback((muted: boolean) => { setProperty('mute', muted).catch(console.warn) }, [])
+  const play          = useCallback(() => { setProperty('pause', false).catch(console.error) }, [])
+  const pause         = useCallback(() => { setProperty('pause', true ).catch(console.error) }, [])
+  const seek          = useCallback((pos: number) => { command('seek', [pos, 'absolute']).catch(console.error) }, [])
+  const frameStep     = useCallback(() => { command('frame-step').catch(console.error) }, [])
+  const frameBackStep = useCallback(() => { command('frame-back-step').catch(console.error) }, [])
+  const setMute       = useCallback((muted: boolean) => { setProperty('mute', muted).catch(console.error) }, [])
 
   return useMemo(
     () => ({ play, pause, seek, frameStep, frameBackStep, setMute }),

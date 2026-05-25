@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useMemo } from 'react'
+import { useRef, useCallback, useState, useMemo, useEffect } from 'react'
 import { Segment } from '../types'
 import { clamp, pixelToTime, timeToPixel, formatTime } from '../utils'
 import { MIN_SEGMENT_PX } from '../constants'
@@ -55,7 +55,35 @@ export function Timeline({
 }: TimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const getWidth = () => containerRef.current?.getBoundingClientRect().width ?? 0
+  // Track the container's pixel width so ruler ticks and segment blocks
+  // recompute whenever the timeline is resized (e.g. window resize, sidebar
+  // open/close). Without this, segments stay at stale pixel positions until
+  // the next state-driven re-render.
+  //
+  // Two parallel trackers:
+  //  - containerWidth  (state) → triggers re-renders, used in useMemo dep arrays
+  //  - containerWidthRef (ref) → always current, used inside startDrag's
+  //    onMouseMove closure where the state value would be stale (startDrag is a
+  //    useCallback whose deps don't include containerWidth, so it captures the
+  //    getWidth from its last creation — the same pattern as visibleDurationRef).
+  const [containerWidth, setContainerWidth] = useState(0)
+  const containerWidthRef = useRef(0)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const update = (w: number) => {
+      containerWidthRef.current = w
+      setContainerWidth(w)
+    }
+    update(el.getBoundingClientRect().width)
+    const ro = new ResizeObserver(entries => update(entries[0].contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Reads the ref so all closures (including stale ones in startDrag) always
+  // get the current width, regardless of when they were created.
+  const getWidth = () => containerWidthRef.current
 
   // ── Visible-window math (zoom) ──────────────────────────────────────────
   // At zoom=1 the entire video is visible. At higher zooms we show a window
@@ -138,7 +166,9 @@ export function Timeline({
 
   // ── Render ──────────────────────────────────────────────────────────────
 
-  const w = getWidth()  // may be 0 on first render — that's fine, ticks won't show
+  // containerWidth (state) drives re-renders and useMemo deps.
+  // getWidth() (ref) is used inside event-handler closures where state would be stale.
+  const w = containerWidth  // may be 0 on first render — that's fine, ticks won't show
 
   // Convert an absolute time into a visible-window pixel x.
   const xOf = (t: number) => timeToPixel(t - effectiveViewStart, w, visibleDuration)

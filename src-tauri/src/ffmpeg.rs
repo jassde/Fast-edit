@@ -489,31 +489,37 @@ fn run_ffmpeg_with_progress(
     let stderr = child.stderr.take().unwrap();
     let mut reader = BufReader::new(stderr);
     let mut line_buf: Vec<u8> = Vec::with_capacity(256);
-    let mut byte = [0u8; 1];
 
+    // ffmpeg writes progress lines ending with `\r` (no newline until the end
+    // of a segment). Read into a 4 KiB buffer rather than one byte at a time
+    // to avoid per-character syscall overhead on long encodes.
+    let mut chunk = [0u8; 4096];
     loop {
-        match reader.read(&mut byte) {
-            Ok(0) => break, // EOF
-            Ok(_) => {
-                let c = byte[0];
-                if c == b'\r' || c == b'\n' {
-                    if !line_buf.is_empty() {
-                        let line = String::from_utf8_lossy(&line_buf);
-                        if let Some(t) = parse_time_pos(&line) {
-                            let seg_pct = if seg_duration > 0.0 {
-                                (t / seg_duration).clamp(0.0, 1.0)
-                            } else {
-                                0.0
-                            };
-                            let overall =
-                                ((seg_index as f64 + seg_pct) / total_segs as f64) * 100.0;
-                            let _ = app
-                                .emit("export-progress", ExportProgressPayload { percent: overall });
+        match reader.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                for &c in &chunk[..n] {
+                    if c == b'\r' || c == b'\n' {
+                        if !line_buf.is_empty() {
+                            let line = String::from_utf8_lossy(&line_buf);
+                            if let Some(t) = parse_time_pos(&line) {
+                                let seg_pct = if seg_duration > 0.0 {
+                                    (t / seg_duration).clamp(0.0, 1.0)
+                                } else {
+                                    0.0
+                                };
+                                let overall =
+                                    ((seg_index as f64 + seg_pct) / total_segs as f64) * 100.0;
+                                let _ = app.emit(
+                                    "export-progress",
+                                    ExportProgressPayload { percent: overall },
+                                );
+                            }
+                            line_buf.clear();
                         }
-                        line_buf.clear();
+                    } else {
+                        line_buf.push(c);
                     }
-                } else {
-                    line_buf.push(c);
                 }
             }
             Err(_) => break,
@@ -790,7 +796,14 @@ pub async fn pick_output_dir(app: AppHandle) -> Result<Option<String>, String> {
     .await
     .map_err(|e| e.to_string())?;
 
-    Ok(folder.map(|p| p.to_string()))
+    // Use into_path() rather than to_string() — on some platforms FilePath's
+    // Display/ToString gives a URI ("file:///…") instead of a filesystem path,
+    // which would cause canonicalize() to fail when the user starts an export.
+    let path = folder
+        .map(|p| p.into_path().map(|pb| pb.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    Ok(path)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -76,6 +76,12 @@ export default function Downloader() {
   }, [downloadedPath])
 
   const handleClearTemp = useCallback(async () => {
+    // Confirm before deleting — destructive and irreversible. If the user just
+    // downloaded a file and hasn't loaded it into the editor yet, this nukes it.
+    const ok = window.confirm(
+      'Delete all files in the Temp folder?\n\nThis cannot be undone.'
+    )
+    if (!ok) return
     setClearingTemp(true)
     try {
       await invoke('clear_temp_dir')
