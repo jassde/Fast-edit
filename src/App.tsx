@@ -3,7 +3,7 @@ import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
-import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 import { useAppState } from './hooks/useAppState'
 import { useMpv } from './hooks/useMpv'
@@ -88,11 +88,12 @@ export default function App() {
 
   // Re-emit slider values whenever they change so the panel stays in sync.
   useEffect(() => {
+    if (!state.showScrollPanel) return
     emit('scroll-settings', {
       framesPerScrollTick:       state.framesPerScrollTick,
       secondsPerShiftScrollTick: state.secondsPerShiftScrollTick,
-    }).catch(() => { /* panel not open — event is silently dropped */ })
-  }, [state.framesPerScrollTick, state.secondsPerShiftScrollTick])
+    }).catch(() => {})
+  }, [state.showScrollPanel, state.framesPerScrollTick, state.secondsPerShiftScrollTick])
 
   // Listen for slider changes originating in the panel window.
   useEffect(() => {
@@ -134,24 +135,6 @@ export default function App() {
       unlisten?.()
     }
   }, [actions])
-
-  // Re-focus this window whenever the panel requests it (belt-and-suspenders).
-  useEffect(() => {
-    let unlisten: (() => void) | null = null
-    let aborted = false
-
-    listen('refocus-main', () => {
-      getCurrentWebviewWindow().setFocus()
-    }).then(ul => {
-      if (aborted) ul()
-      else unlisten = ul
-    })
-
-    return () => {
-      aborted = true
-      unlisten?.()
-    }
-  }, [])
 
   // Open or close the scroll-panel window when showScrollPanel toggles.
   useEffect(() => {
