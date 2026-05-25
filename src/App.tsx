@@ -2,8 +2,8 @@ import './App.css'
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { emit, listen } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow, WebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 import { useAppState } from './hooks/useAppState'
 import { useMpv } from './hooks/useMpv'
@@ -16,9 +16,10 @@ import { PlaybackControls } from './components/PlaybackControls'
 import { Timeline } from './components/Timeline'
 import { ExportModal } from './components/ExportModal'
 import { SettingsModal } from './components/SettingsModal'
-import { ScrollSettingsPanel } from './components/ScrollSettingsPanel'
 
 const NO_HW_SUPPORT: HwSupport = { nvenc: false, qsv: false, amf: false }
+
+type ScrollSettingsChangePayload = { kind: 'frames' | 'seconds'; value: number }
 
 export default function App() {
   const [state, actions] = useAppState()
@@ -79,6 +80,125 @@ export default function App() {
       unlisten?.()
     }
   }, [actions])
+
+  // ── Scroll-panel window lifecycle ─────────────────────────────────────────
+  // Manages a decoration-free WebviewWindow that shows the two scroll-step
+  // sliders. The window opens without stealing focus (focused: false) and
+  // immediately re-focuses this window on every mousedown (see ScrollPanelApp).
+
+  // Re-emit slider values whenever they change so the panel stays in sync.
+  useEffect(() => {
+    emit('scroll-settings', {
+      framesPerScrollTick:       state.framesPerScrollTick,
+      secondsPerShiftScrollTick: state.secondsPerShiftScrollTick,
+    }).catch(() => { /* panel not open — event is silently dropped */ })
+  }, [state.framesPerScrollTick, state.secondsPerShiftScrollTick])
+
+  // Listen for slider changes originating in the panel window.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let aborted = false
+
+    listen<ScrollSettingsChangePayload>('scroll-settings-change', e => {
+      if (e.payload.kind === 'frames') {
+        actions.setFramesPerScrollTick(e.payload.value)
+      } else {
+        actions.setSecondsPerShiftScrollTick(e.payload.value)
+      }
+    }).then(ul => {
+      if (aborted) ul()
+      else unlisten = ul
+    })
+
+    return () => {
+      aborted = true
+      unlisten?.()
+    }
+  }, [actions])
+
+  // Listen for the panel's close button — the panel emits scroll-panel-close
+  // to keep main state in sync.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let aborted = false
+
+    listen('scroll-panel-close', async () => {
+      const panelWin = await WebviewWindow.getByLabel('scroll-panel')
+      panelWin?.close()
+      actions.setShowScrollPanel(false)
+    }).then(ul => {
+      if (aborted) ul()
+      else unlisten = ul
+    })
+
+    return () => {
+      aborted = true
+      unlisten?.()
+    }
+  }, [actions])
+
+  // Re-focus this window whenever the panel requests it (belt-and-suspenders).
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let aborted = false
+
+    listen('refocus-main', () => {
+      getCurrentWebviewWindow().setFocus()
+    }).then(ul => {
+      if (aborted) ul()
+      else unlisten = ul
+    })
+
+    return () => {
+      aborted = true
+      unlisten?.()
+    }
+  }, [])
+
+  // Open or close the scroll-panel window when showScrollPanel toggles.
+  useEffect(() => {
+    if (!state.showScrollPanel) {
+      WebviewWindow.getByLabel('scroll-panel').then(win => win?.close())
+      return
+    }
+
+    WebviewWindow.getByLabel('scroll-panel').then(existing => {
+      if (existing) return  // already open — don't steal focus by re-opening
+
+      const win = new WebviewWindow('scroll-panel', {
+        url:           'index.html#scroll-panel',
+        title:         'Scroll Step',
+        decorations:   false,
+        alwaysOnTop:   true,
+        skipTaskbar:   true,
+        focus:         false,
+        width:         280,
+        height:        168,
+        resizable:     false,
+        center:        true,
+      })
+
+      win.once('tauri://error', (e) => {
+        console.error('Scroll-panel window error:', e)
+      })
+
+      // If the user closes the window via OS (e.g. Alt+F4), sync main state.
+      win.once('tauri://destroyed', () => {
+        actions.setShowScrollPanel(false)
+      })
+
+      // Push current values as soon as the window is ready.
+      win.once('tauri://created', () => {
+        emit('scroll-settings', {
+          framesPerScrollTick:       state.framesPerScrollTick,
+          secondsPerShiftScrollTick: state.secondsPerShiftScrollTick,
+        }).catch(() => {})
+      })
+    })
+  // framesPerScrollTick / secondsPerShiftScrollTick intentionally excluded —
+  // this effect only manages window open/close. Slider sync has its own effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.showScrollPanel, actions])
 
   // Open the downloader as a separate Tauri window; focus it if already open
   const openDownloaderWindow = useCallback(async () => {
@@ -300,16 +420,6 @@ export default function App() {
         />
       )}
 
-      {/* ── Floating scroll-step panel (independent of the Settings modal) ── */}
-      {state.showScrollPanel && (
-        <ScrollSettingsPanel
-          framesPerScrollTick={state.framesPerScrollTick}
-          secondsPerShiftScrollTick={state.secondsPerShiftScrollTick}
-          onChangeFrames={actions.setFramesPerScrollTick}
-          onChangeSeconds={actions.setSecondsPerShiftScrollTick}
-          onClose={() => actions.setShowScrollPanel(false)}
-        />
-      )}
 
     </div>
   )
