@@ -10,7 +10,8 @@
   /* Warm-tinted neutrals (hue ~25, very low chroma). Tinting toward the
      brand red keeps the chrome from reading as a flat photographic gray. */
   --bg-deep:    oklch(0.20 0.005 25);   /* page background, recessed inputs, timeline */
-  --bg-toolbar: oklch(0.32 0.005 25);   /* top bar, controls bar, modal panel */
+  --bg-toolbar: oklch(0.32 0.005 25);   /* top bar, controls bar */
+  --bg-modal:   oklch(0.44 0.005 25);   /* modal/dialog panel — lifted above toolbar for readability */
   --bg-surface: oklch(0.40 0.005 25);   /* default buttons */
   --bg-hover:   oklch(0.46 0.005 25);
   --bg-active:  oklch(0.27 0.005 25);
@@ -496,7 +497,7 @@ html, body, #root {
 }
 
 .modal {
-  background: var(--bg-toolbar);
+  background: var(--bg-modal);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 24px;

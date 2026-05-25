@@ -3,9 +3,18 @@
 
 /* =========================================================================
    Global / window
+   -------------------------------------------------------------------------
+   Scoped to .downloader-window (added to <html> by main.tsx when hash is
+   #downloader). MUST NOT apply globally — App.css sets the main window's
+   body to `background: transparent` so libmpv can render behind the
+   WebView. A bare `html, body, #root { background: ... }` rule here would
+   leak into the main window via Vite's global CSS bundle and hide the
+   video.
    ========================================================================= */
-html, body, #root {
-  background: var(--bg-deep) !important;
+.downloader-window,
+.downloader-window body,
+.downloader-window #root {
+  background: var(--bg-deep);
   overflow: hidden;
 }
 
@@ -388,7 +397,10 @@ html, body, #root {
   padding: 16px;
 }
 
-.modal {
+/* Scoped to the downloader window — avoids overriding App.css's .modal in
+   the main window (Vite bundles all CSS globally; bare .modal would win
+   over App.css's rule and make the export/settings modals too dark). */
+.downloader-window .modal {
   background: var(--bg-deep);
   border-radius: 24px;
   max-width: 500px;
@@ -456,7 +468,7 @@ html, body, #root {
     flex: 1;
     justify-content: center;
   }
-  .modal {
+  .downloader-window .modal {
     padding: 20px;
   }
 }
