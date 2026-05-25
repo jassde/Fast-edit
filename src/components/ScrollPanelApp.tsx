@@ -39,13 +39,16 @@ type ScrollSettingsPayload = {
   secondsPerShiftScrollTick: number
 }
 
+type ScrollSettingsChangePayload = {
+  kind:  'frames' | 'seconds'
+  value: number
+}
+
 export function ScrollPanelApp() {
   const [frames,  setFrames]  = useState(() => readFromStorage().frames)
   const [seconds, setSeconds] = useState(() => readFromStorage().seconds)
 
-  // Sync incoming state from the main window. Note: the main window emits
-  // scroll-settings on tauri://created, but that event may arrive before
-  // this listener registers — localStorage initial values cover that gap.
+  // Sync incoming state from the main window.
   useEffect(() => {
     let unlisten: (() => void) | null = null
     let aborted = false
@@ -76,12 +79,12 @@ export function ScrollPanelApp() {
 
   const handleFramesChange = (value: number) => {
     setFrames(value)
-    emit('scroll-settings-change', { kind: 'frames', value }).catch(console.error)
+    emit<ScrollSettingsChangePayload>('scroll-settings-change', { kind: 'frames', value }).catch(console.error)
   }
 
   const handleSecondsChange = (value: number) => {
     setSeconds(value)
-    emit('scroll-settings-change', { kind: 'seconds', value }).catch(console.error)
+    emit<ScrollSettingsChangePayload>('scroll-settings-change', { kind: 'seconds', value }).catch(console.error)
   }
 
   const handleClose = () => {
