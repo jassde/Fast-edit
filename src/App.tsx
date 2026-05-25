@@ -7,6 +7,7 @@ import { useAppState } from './hooks/useAppState'
 import { useMpv } from './hooks/useMpv'
 import { useFileDrop } from './hooks/useFileDrop'
 import { useKeyboard } from './hooks/useKeyboard'
+import { useWheelSeek } from './hooks/useWheelSeek'
 import { HwSupport } from './types'
 
 import { PlaybackControls } from './components/PlaybackControls'
@@ -44,6 +45,9 @@ export default function App() {
 
   // Global keyboard shortcuts
   useKeyboard(state, actions, playback)
+
+  // Global scroll-wheel seeking (works anywhere in the window, not just the timeline)
+  useWheelSeek(state, actions, playback)
 
   // Native file picker (Open File button)
   const handleOpenFile = useCallback(async () => {
@@ -199,9 +203,6 @@ export default function App() {
           segments={state.segments}
           selectedSegmentId={state.selectedSegmentId}
           playheadPosition={state.playheadPosition}
-          fps={state.fps}
-          framesPerScrollTick={state.framesPerScrollTick}
-          secondsPerShiftScrollTick={state.secondsPerShiftScrollTick}
           zoom={timelineZoom}
           onSeek={handleSeek}
           onSelectSegment={actions.selectSegment}

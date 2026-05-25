@@ -1,7 +1,7 @@
-import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
+import { useRef, useCallback, useState, useMemo } from 'react'
 import { Segment } from '../types'
 import { clamp, pixelToTime, timeToPixel, formatTime } from '../utils'
-import { DEFAULT_FPS, MIN_SEGMENT_PX } from '../constants'
+import { MIN_SEGMENT_PX } from '../constants'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -10,10 +10,6 @@ type TimelineProps = {
   segments: Segment[]
   selectedSegmentId: string | null
   playheadPosition: number
-  /** Clip frame rate, used to convert "frames per scroll tick" into a time step. */
-  fps: number
-  framesPerScrollTick: number
-  secondsPerShiftScrollTick: number
   /**
    * Magnification factor. 1 = full timeline visible. Higher zoom shows a
    * window of `duration / zoom` seconds, auto-centered on the playhead and
@@ -51,9 +47,6 @@ export function Timeline({
   segments,
   selectedSegmentId,
   playheadPosition,
-  fps,
-  framesPerScrollTick,
-  secondsPerShiftScrollTick,
   zoom,
   onSeek,
   onSelectSegment,
@@ -142,44 +135,6 @@ export function Timeline({
     },
     [duration, effectiveViewStart, visibleDuration, onSeek]
   )
-
-  // ── Scroll wheel ────────────────────────────────────────────────────────
-  // React attaches `wheel` as a passive listener, so e.preventDefault() inside
-  // a React onWheel handler is a no-op. Attach a native non-passive listener
-  // so the page doesn't scroll when the user wheels over the timeline.
-  //
-  // The handler reads playheadPosition through a ref so the effect doesn't
-  // re-fire on every mpv position update (~30 fps), which would tear down and
-  // re-add the listener on every animation frame.
-
-  const playheadRef = useRef(playheadPosition)
-  playheadRef.current = playheadPosition
-
-  // Mirror settings into refs so the wheel useEffect doesn't re-register when
-  // the user adjusts a slider — same pattern as playheadRef above.
-  const framesRef  = useRef(framesPerScrollTick)
-  const secondsRef = useRef(secondsPerShiftScrollTick)
-  const fpsRef     = useRef(fps)
-  framesRef.current  = framesPerScrollTick
-  secondsRef.current = secondsPerShiftScrollTick
-  fpsRef.current     = fps
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const handleWheel = (e: WheelEvent) => {
-      if (duration === 0) return
-      e.preventDefault()
-      const direction = e.deltaY > 0 ? 1 : -1
-      const stepSec   = e.shiftKey
-        ? direction * secondsRef.current
-        : direction * framesRef.current * (1 / (fpsRef.current || DEFAULT_FPS))
-      const newPos    = clamp(playheadRef.current + stepSec, 0, duration)
-      onSeek(newPos)
-    }
-    el.addEventListener('wheel', handleWheel, { passive: false })
-    return () => el.removeEventListener('wheel', handleWheel)
-  }, [duration, onSeek])
 
   // ── Render ──────────────────────────────────────────────────────────────
 
