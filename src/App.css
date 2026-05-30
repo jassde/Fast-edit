@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
 /* ── Reset ───────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -7,51 +9,60 @@
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  /* Pure neutral grayscale — no warm tint. User-specified palette. */
-  --bg-deep:    #1d1d1d;   /* page bg, timeline, recessed inputs, pressed */
-  --bg-toolbar: #212121;   /* top bar, controls bar */
-  --bg-modal:   #262626;   /* modal/dialog panel */
-  --bg-chrome:  #262626;   /* chrome-bar buttons */
-  --bg-surface: #2d2d2d;   /* default buttons */
-  --bg-hover:   #343434;   /* hover state */
-  --bg-active:  #1d1d1d;   /* pressed state — darker step */
-  --border:     #343434;   /* default rule */
-  --border-strong: #5a5a5a;/* selected / focus accent border */
+  /* Pure neutral dark grays — distinct elevation steps, zero tint. */
+  --bg-deep:    #161616;   /* page bg, timeline, recessed inputs, pressed */
+  --bg-toolbar: #1c1c1c;   /* top bar, controls bar */
+  --bg-modal:   #222222;   /* modal/dialog panel */
+  --bg-chrome:  #252525;   /* chrome-bar buttons */
+  --bg-surface: #2b2b2b;   /* default buttons */
+  --bg-hover:   #333333;   /* hover state */
+  --bg-active:  #161616;   /* pressed state */
+  --border:     #2e2e2e;   /* default rule */
+  --border-strong: #525252;/* selected / focus accent border */
 
-  --text-primary:   #f1f1f1;
-  --text-secondary: #c8c8c8;
-  --text-muted:     #8a8a8a;
-  --text-faint:     #5a5a5a;
+  --text-primary:   #f2f2f2;
+  --text-secondary: #c4c4c4;
+  --text-muted:     #888888;
+  --text-faint:     #505050;
 
-  /* Accent — warm orange-red, slightly brighter to pop on neutral grays. */
-  --accent:        oklch(0.68 0.20 30);
-  --accent-hover:  oklch(0.74 0.20 30);
-  --accent-press:  oklch(0.60 0.20 30);
-  --accent-soft-bg:     color-mix(in oklch, var(--accent) 14%, transparent);
-  --accent-soft-border: color-mix(in oklch, var(--accent) 40%, transparent);
+  /* Accent — warm amber-gold. Pops cleanly on neutral darks. */
+  --accent:        oklch(0.74 0.17 52);
+  --accent-hover:  oklch(0.80 0.17 52);
+  --accent-press:  oklch(0.64 0.17 52);
+  --accent-soft-bg:     color-mix(in oklch, var(--accent) 13%, transparent);
+  --accent-soft-border: color-mix(in oklch, var(--accent) 38%, transparent);
 
-  --danger:        oklch(0.65 0.18 28);
-  --danger-hover:  oklch(0.70 0.20 28);
+  --danger:        oklch(0.65 0.20 22);
+  --danger-hover:  oklch(0.72 0.20 22);
 
-  /* Focus ring — same hue, semi-transparent. */
-  --focus-ring:    color-mix(in oklch, var(--accent) 55%, transparent);
+  /* Focus ring */
+  --focus-ring: color-mix(in oklch, var(--accent) 50%, transparent);
 
   /* Motion */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  font-size: 15px;
+  /* ── Type scale ─────────────────────────────────────────────────────────
+     2xs → xs → sm → base → md → lg → xl
+     10   11   12.5  13.5   15   17   21    (px)                          */
+  --text-2xs:  10px;
+  --text-xs:   11px;
+  --text-sm:   12.5px;
+  --text-base: 13.5px;
+  --text-md:   15px;
+  --text-lg:   17px;
+  --text-xl:   21px;
+
+  font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--text-base);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
 }
 
 html, body, #root {
   height: 100%;
   overflow: hidden;
-  /* Transparent so libmpv can render its video output behind the WebView.
-     Each chrome region paints its own opaque background; only #video-panel
-     is see-through. */
   background: transparent;
 }
 
@@ -72,45 +83,45 @@ html, body, #root {
 
 /* ── Top bar ─────────────────────────────────────────────────────────────── */
 .top-bar {
-  height: 50px;
+  height: 46px;
   background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 12px;
+  padding: 0 16px;
+  gap: 10px;
   flex-shrink: 0;
-  position: relative;   /* anchor for the centered dropdown */
+  position: relative;
 }
 
-/* ── Separator between top-bar sections ───────────────────────────────────── */
+/* ── Separator between top-bar sections ──────────────────────────────────── */
 .top-bar-sep {
   width: 1px;
-  height: 28px;
+  height: 22px;
   background: var(--border);
   flex-shrink: 0;
 }
 
-/* Compact time readout in the top bar — sits next to Open File. */
+/* Compact time readout in the top bar. */
 .top-bar-time {
   font-variant-numeric: tabular-nums;
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  padding: 7px 14px;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-secondary);
+  padding: 5px 12px;
   background: var(--bg-deep);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  letter-spacing: -0.01em;
+  gap: 6px;
+  letter-spacing: 0.01em;
   white-space: nowrap;
-  min-width: 168px;
+  min-width: 158px;
   justify-content: center;
 }
-.top-bar-time .total { color: var(--text-muted); font-weight: 400; }
+.top-bar-time .total { color: var(--text-faint); font-weight: 400; }
 .top-bar-time .sep   { color: var(--text-faint); }
 
 /* ── Top-bar centre dropdown ─────────────────────────────────────────────── */
@@ -119,34 +130,33 @@ html, body, #root {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  /* Sit above the flex children so the panel overlaps content below */
   z-index: 60;
 }
 
 /* Trigger: three-dot affordance */
 .top-bar-dropdown-trigger {
-  font-size: 18px;
-  letter-spacing: 0.18em;
-  padding: 10px 18px;
-  min-width: 56px;
+  font-size: 17px;
+  letter-spacing: 0.20em;
+  padding: 8px 16px;
+  min-width: 50px;
   line-height: 1;
 }
 
 .top-bar-dropdown-menu {
   display: none;
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  width: 460px;
+  width: 440px;
   background: var(--bg-modal);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.70), 0 2px 8px rgba(0, 0, 0, 0.40);
   overflow: hidden;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 16px;
+  gap: 8px;
+  padding: 14px;
 }
 .top-bar-dropdown-menu.open {
   display: flex;
@@ -156,42 +166,41 @@ html, body, #root {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  /* 3 per row, accounting for 2 gaps of 10px and 32px padding */
-  width: calc((100% - 20px) / 3);
+  gap: 7px;
+  width: calc((100% - 16px) / 3);
   aspect-ratio: 1.15;
-  background: var(--bg-surface);
+  background: var(--bg-chrome);
   border: 1px solid var(--border);
   border-radius: 10px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
-  letter-spacing: 0.02em;
-  transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out), color 140ms var(--ease-out);
+  letter-spacing: 0.03em;
+  transition: background 130ms var(--ease-out), border-color 130ms var(--ease-out), color 130ms var(--ease-out);
 }
 .dropdown-item:hover {
   background: var(--bg-hover);
   border-color: var(--border-strong);
   color: var(--text-primary);
 }
-.dropdown-item svg { width: 22px; height: 22px; opacity: 0.9; }
+.dropdown-item svg { width: 20px; height: 20px; opacity: 0.85; }
 
 .app-title {
   font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.14em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-faint);
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   flex-shrink: 0;
 }
 .app-title::before {
   content: '';
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 2px;
   background: var(--accent);
   flex-shrink: 0;
@@ -206,7 +215,6 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Drop-target feedback while a file is being dragged over the window. */
 .video-panel.drag-over::after {
   content: '';
   position: absolute;
@@ -217,7 +225,6 @@ html, body, #root {
   pointer-events: none;
 }
 
-/* Empty-state and error banners share a layout but not a color role. */
 .video-banner {
   position: absolute;
   inset: 0;
@@ -225,19 +232,29 @@ html, body, #root {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   background: var(--bg-deep);
   padding: 24px;
   text-align: center;
 }
-.video-banner--empty { color: var(--text-muted); font-size: 14px; }
-.video-banner--empty .hint { font-size: 12px; margin-top: 2px; }
-.video-banner--error { color: var(--accent); font-size: 14px; }
+.video-banner--empty {
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.video-banner--empty .hint {
+  font-size: var(--text-xs);
+  margin-top: 2px;
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+.video-banner--error { color: var(--accent); font-size: var(--text-sm); }
 .video-banner--error a { color: var(--accent); text-decoration: underline; }
 
-/* ── Unified control bar (transport + segment edit/nav + zoom) ───────────── */
+/* ── Unified control bar ─────────────────────────────────────────────────── */
 .playback-controls {
-  height: 60px;
+  height: 56px;
   background: var(--bg-toolbar);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -245,56 +262,53 @@ html, body, #root {
   align-items: center;
   gap: 0;
   flex-shrink: 0;
-  padding: 0 8px;
+  padding: 0 10px;
   position: relative;
 }
 
 .pc-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
-.pc-group--left   { flex: 1; justify-content: flex-start; gap: 8px; }
+.pc-group--left   { flex: 1; justify-content: flex-start; gap: 6px; }
 .pc-group--center {
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
 }
-.pc-group--right  { flex: 1; justify-content: flex-end; gap: 8px; }
+.pc-group--right  { flex: 1; justify-content: flex-end; gap: 6px; }
 
-/* Vertical divider between control groups */
 .pc-sep {
   width: 1px;
-  height: 32px;
+  height: 28px;
   background: var(--border);
   margin: 0 4px;
   flex-shrink: 0;
 }
 
-/* Uppercase mini-label above or beside a control group */
 .pc-label {
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-faint);
   font-weight: 600;
   white-space: nowrap;
 }
 
-/* Set In / Set Out — pushed toward the transport, side by side */
 .pc-inout {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-left: 20px;
+  gap: 6px;
+  margin-left: 16px;
 }
 
-/* ── Timeline zoom slider (right group) ──────────────────────────────────── */
+/* ── Timeline zoom slider ─────────────────────────────────────────────────── */
 .timeline-zoom-slider {
-  width: 140px;
+  width: 120px;
   cursor: pointer;
 }
 
@@ -302,24 +316,25 @@ html, body, #root {
 .float-panel {
   position: fixed;
   z-index: 50;
-  width: 272px;
+  width: 268px;
   background: var(--bg-toolbar);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.50);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
   user-select: none;
 }
 .float-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 10px 7px 14px;
+  padding: 6px 10px 6px 14px;
   border-bottom: 1px solid var(--border);
   cursor: grab;
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.09em;
+  font-weight: 600;
 }
 .float-panel-header:active { cursor: grabbing; }
 .float-panel-close {
@@ -327,7 +342,7 @@ html, body, #root {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
   padding: 0 4px;
   border-radius: 3px;
@@ -341,11 +356,7 @@ html, body, #root {
   gap: 10px;
 }
 
-/* ── Scroll-panel window ─────────────────────────────────────────────────
-   Scoped to .scroll-panel-window (set on <html> in main.tsx when the URL
-   hash is #scroll-panel). Vite bundles every imported CSS into one global
-   stylesheet, so any rule that re-paints html/body or sizes #root must be
-   scoped here — unscoped versions would also hit the main window. */
+/* ── Scroll-panel window ─────────────────────────────────────────────────── */
 .scroll-panel-window,
 .scroll-panel-window body,
 .scroll-panel-window #root {
@@ -370,7 +381,7 @@ html, body, #root {
 
 /* ── Timeline strip ──────────────────────────────────────────────────────── */
 .timeline-strip {
-  height: 116px;
+  height: 112px;
   background: var(--bg-deep);
   border-top: 1px solid var(--border);
   position: relative;
@@ -380,25 +391,27 @@ html, body, #root {
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .btn {
-  padding: 11px 22px;
-  border-radius: 8px;
+  padding: 0 16px;
+  border-radius: 7px;
   border: 1px solid var(--border);
   background: var(--bg-surface);
   color: var(--text-primary);
   cursor: pointer;
-  font-size: 15px;
+  font-size: var(--text-base);
   font-family: inherit;
   font-weight: 500;
-  letter-spacing: -0.005em;
-  transition: background 140ms var(--ease-out), color 140ms var(--ease-out), border-color 140ms var(--ease-out), transform 140ms var(--ease-out);
+  letter-spacing: -0.01em;
+  transition: background 130ms var(--ease-out), color 130ms var(--ease-out),
+              border-color 130ms var(--ease-out), transform 120ms var(--ease-out),
+              box-shadow 130ms var(--ease-out);
   user-select: none;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
   line-height: 1;
-  min-height: 42px;
+  min-height: 36px;
 }
 
 .btn:hover:not(:disabled) {
@@ -412,183 +425,222 @@ html, body, #root {
 }
 
 .btn:disabled {
-  opacity: 0.35;
+  opacity: 0.28;
   cursor: default;
 }
 
-/* Primary: confirmation / terminal actions (Export). Solid accent. */
+/* Primary: solid accent fill. */
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1d1d1d;
+  color: #0f1219;
   font-weight: 600;
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+  box-shadow: 0 2px 12px color-mix(in oklch, var(--accent) 40%, transparent);
 }
 .btn-primary:active:not(:disabled) {
   background: var(--accent-press);
   border-color: var(--accent-press);
+  box-shadow: none;
 }
 
-/* Danger: destructive (Delete). Outlined so it never looks like Primary. */
+/* Danger: outlined. */
 .btn-danger {
   background: transparent;
-  border-color: var(--danger);
+  border-color: color-mix(in oklch, var(--danger) 60%, transparent);
   color: var(--danger);
 }
 .btn-danger:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--danger) 14%, transparent);
-  color: var(--danger-hover);
-  border-color: var(--danger-hover);
-}
-
-/* Danger icon-only variant — colored glyph, neutral bg until hover */
-.btn-danger-icon {
-  color: var(--danger);
-}
-.btn-danger-icon:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--danger) 14%, transparent);
+  background: color-mix(in oklch, var(--danger) 12%, transparent);
   border-color: var(--danger);
   color: var(--danger-hover);
 }
 
-.btn-icon {
-  padding: 11px 14px;
-  min-width: 44px;
+/* Danger icon-only variant */
+.btn-danger-icon {
+  color: var(--danger);
+  border-color: var(--border);
+}
+.btn-danger-icon:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--danger) 12%, transparent);
+  border-color: color-mix(in oklch, var(--danger) 60%, transparent);
+  color: var(--danger-hover);
 }
 
-/* Wide variants for segment editing buttons — larger click targets */
-.btn-add-delete { min-width: 84px; padding: 11px 20px; }
-.btn-inout      { min-width: 72px; padding: 11px 20px; font-weight: 600; }
+/* Icon-only buttons */
+.btn-icon {
+  padding: 0 12px;
+  min-width: 36px;
+  min-height: 36px;
+}
 
-.btn-wide { min-width: 80px; }
+/* Segment editing buttons */
+.btn-add-delete { min-width: 74px; padding: 0 16px; }
+.btn-inout      { min-width: 56px; padding: 0 14px; font-weight: 600; font-size: var(--text-sm); letter-spacing: 0.04em; }
+
+/* Add segment — dark green fill on hover */
+.btn-add-delete:not(.btn-danger-icon):hover:not(:disabled) {
+  background: oklch(0.28 0.08 155);
+  border-color: oklch(0.42 0.12 155);
+  color: oklch(0.78 0.14 155);
+}
+.btn-add-delete:not(.btn-danger-icon):active:not(:disabled) {
+  background: oklch(0.22 0.07 155);
+  border-color: oklch(0.38 0.10 155);
+}
+
+/* Delete segment — dark red fill on hover (overrides btn-danger-icon ghost style) */
+.btn-add-delete.btn-danger-icon:hover:not(:disabled) {
+  background: oklch(0.26 0.10 22);
+  border-color: oklch(0.42 0.16 22);
+  color: oklch(0.78 0.18 22);
+}
+.btn-add-delete.btn-danger-icon:active:not(:disabled) {
+  background: oklch(0.20 0.08 22);
+  border-color: oklch(0.36 0.14 22);
+}
+
+.btn-wide { min-width: 72px; }
 
 /* Large primary play button */
 .btn-play-lg {
-  min-width: 60px !important;
-  min-height: 48px !important;
-  padding: 12px 16px !important;
+  min-width: 84px !important;
+  min-height: 44px !important;
+  padding: 0 24px !important;
   border-radius: 10px;
-  box-shadow: 0 4px 14px color-mix(in oklch, var(--accent) 35%, transparent);
+  box-shadow: 0 3px 12px color-mix(in oklch, var(--accent) 32%, transparent);
 }
 .btn-play-lg:hover:not(:disabled) {
-  box-shadow: 0 6px 18px color-mix(in oklch, var(--accent) 45%, transparent);
+  box-shadow: 0 5px 18px color-mix(in oklch, var(--accent) 44%, transparent);
 }
 
-/* Export button — icon + label, slightly padded */
+/* Export button */
 .btn-export {
-  padding: 11px 20px;
+  padding: 0 18px;
   font-weight: 600;
-  gap: 8px;
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  gap: 7px;
+  min-height: 32px;
 }
-.btn-export svg { width: 16px; height: 16px; }
+.btn-export svg { width: 14px; height: 14px; }
 
-/* Chrome-bar buttons (Open File, •••) — quietest tier. */
+/* Chrome-bar buttons (Open File, •••) */
 .btn-chrome {
   background: var(--bg-chrome);
   border-color: var(--border);
+  font-size: var(--text-sm);
+  min-height: 30px;
+  padding: 0 13px;
+  border-radius: 6px;
+  color: var(--text-secondary);
 }
 .btn-chrome:hover:not(:disabled) {
   background: var(--bg-hover);
+  color: var(--text-primary);
 }
 .btn-chrome:active:not(:disabled) {
   background: var(--bg-active);
 }
 
-/* Inline SVG icons inside buttons (transport, mute). */
+/* Inline SVG icons inside buttons */
 .btn svg {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
   fill: currentColor;
   display: block;
+  flex-shrink: 0;
 }
-.btn-icon-lg svg { width: 22px; height: 22px; }
+.btn-icon-lg svg { width: 20px; height: 20px; }
 
 /* ── Export segment checklist ────────────────────────────────────────────── */
 .segment-checklist {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px;
+  padding: 5px;
   background: var(--bg-deep);
 }
 .segment-checklist-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
+  gap: 9px;
+  font-size: var(--text-sm);
   padding: 5px 6px;
   border-radius: 4px;
   cursor: pointer;
 }
 .segment-checklist-row:hover { background: var(--bg-surface); }
 .segment-swatch {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 2px;
   flex-shrink: 0;
 }
 .segment-checklist-time {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
 }
 
 /* ── Segment selection indicator ─────────────────────────────────────────── */
 .segment-indicator {
-  font-size: 14px;
-  color: var(--text-secondary);
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
   font-weight: 500;
   white-space: nowrap;
-  padding: 8px 14px;
+  padding: 6px 12px;
   background: var(--bg-deep);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  min-width: 64px;
+  border-radius: 6px;
+  min-width: 58px;
   text-align: center;
+  letter-spacing: 0.02em;
 }
 .segment-indicator b { color: var(--accent); font-weight: 600; }
 
-/* ── Time display (single combined "current / total") ────────────────────── */
+/* ── Time display ────────────────────────────────────────────────────────── */
 .time-display {
   font-variant-numeric: tabular-nums;
-  font-size: 18px;
+  font-size: var(--text-xl);
   color: var(--text-primary);
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
-  font-weight: 500;
-  padding: 8px 16px;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
+  font-weight: 400;
+  padding: 7px 18px;
   background: var(--bg-deep);
   border: 1px solid var(--border);
   border-radius: 8px;
   white-space: nowrap;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 200px;
+  min-width: 210px;
   justify-content: center;
 }
 .time-display .total {
-  color: var(--text-muted);
+  color: var(--text-faint);
   font-weight: 400;
 }
 .time-display .sep {
   color: var(--text-faint);
+  opacity: 0.5;
 }
 
 /* ── Timeline component ──────────────────────────────────────────────────── */
 .timeline-container {
   position: relative;
   width: 100%;
-  height: 116px;
+  height: 112px;
   overflow: hidden;
   cursor: default;
   user-select: none;
@@ -599,7 +651,7 @@ html, body, #root {
   top: 0;
   left: 0;
   right: 0;
-  height: 26px;
+  height: 24px;
   background: var(--bg-deep);
   border-bottom: 1px solid var(--border);
   cursor: pointer;
@@ -609,32 +661,32 @@ html, body, #root {
   position: absolute;
   top: 0;
   width: 1px;
-  height: 8px;
+  height: 7px;
   background: var(--text-faint);
   pointer-events: none;
 }
 
 .ruler-tick.major {
-  height: 16px;
-  background: var(--text-muted);
+  height: 14px;
+  background: var(--border-strong);
 }
 
 .ruler-label {
   position: absolute;
   top: 4px;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   transform: translateX(-50%);
   white-space: nowrap;
   pointer-events: none;
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 
 .segments-area {
   position: absolute;
-  top: 26px;
+  top: 24px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -642,23 +694,21 @@ html, body, #root {
 
 .segment-block {
   position: absolute;
-  top: 8px;
-  bottom: 8px;
-  border: 2px solid;
-  border-radius: 6px;
+  top: 7px;
+  bottom: 7px;
+  border: 1.5px solid;
+  border-radius: 5px;
   min-width: 4px;
   cursor: pointer;
-  transition: filter 140ms var(--ease-out);
+  transition: filter 130ms var(--ease-out);
 }
-.segment-block:hover { filter: brightness(1.15); }
+.segment-block:hover { filter: brightness(1.18); }
 
 .segment-block.selected {
-  filter: brightness(1.35);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.4);
+  filter: brightness(1.4);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.16), 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
-/* A segment so short that its real width would be below the handle minimum
-   renders as a thin marker rather than a fake-wide block. */
 .segment-block.tiny {
   border-width: 1px;
   border-radius: 2px;
@@ -668,26 +718,25 @@ html, body, #root {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 16px;
-  background: rgba(255, 255, 255, 0.14);
+  width: 14px;
+  background: rgba(255, 255, 255, 0.12);
   cursor: ew-resize;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  transition: background 160ms var(--ease-out);
+  transition: background 150ms var(--ease-out);
 }
-.seg-handle:hover { background: rgba(255, 255, 255, 0.32); }
-.seg-handle-left  { left: 0;  border-radius: 4px 0 0 4px; }
-.seg-handle-right { right: 0; border-radius: 0 4px 4px 0; }
+.seg-handle:hover { background: rgba(255, 255, 255, 0.28); }
+.seg-handle-left  { left: 0;  border-radius: 3px 0 0 3px; }
+.seg-handle-right { right: 0; border-radius: 0 3px 3px 0; }
 
-/* Grip lines inside handles */
 .seg-handle::before,
 .seg-handle::after {
   content: '';
-  width: 2px;
-  height: 50%;
-  background: rgba(255, 255, 255, 0.7);
+  width: 1.5px;
+  height: 48%;
+  background: rgba(255, 255, 255, 0.65);
   border-radius: 1px;
 }
 
@@ -699,15 +748,14 @@ html, body, #root {
   z-index: 10;
 }
 
-/* Stronger playhead with drop-shadow for visibility over segment colors. */
 .playhead-head {
   width: 0;
   height: 0;
-  margin-left: -10px;
-  border-left:  10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top:   12px solid #fafafa;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  margin-left: -8px;
+  border-left:  8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top:   10px solid #eef0f6;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
 }
 
 .playhead-line {
@@ -716,15 +764,15 @@ html, body, #root {
   bottom: 0;
   left: 0;
   width: 1px;
-  background: rgba(250, 250, 250, 0.85);
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+  background: rgba(238, 240, 246, 0.80);
+  box-shadow: 0 0 5px rgba(238, 240, 246, 0.25);
 }
 
 /* ── Modals ──────────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.70);
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -734,37 +782,37 @@ html, body, #root {
 .modal {
   background: var(--bg-modal);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 32px;
-  width: 520px;
+  border-radius: 14px;
+  padding: 28px;
+  width: 500px;
   max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
+  gap: 18px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.70);
 }
 
 .modal-title {
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
 .modal-field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
 }
 
 .modal-label {
-  font-size: 12px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.10em;
 }
 
 .modal-row {
@@ -775,17 +823,17 @@ html, body, #root {
 
 .modal-input,
 .modal-select {
-  padding: 8px 12px;
+  padding: 7px 11px;
   background: var(--bg-deep);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-family: inherit;
-  transition: border-color 160ms var(--ease-out);
+  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
 }
 
-.modal-select { cursor: pointer; padding: 7px 10px; }
+.modal-select { cursor: pointer; padding: 6px 10px; }
 
 .modal-input:focus,
 .modal-select:focus {
@@ -795,9 +843,9 @@ html, body, #root {
 }
 
 .modal-path {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Consolas', monospace;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -806,82 +854,82 @@ html, body, #root {
 
 .modal-radio-group {
   display: flex;
-  gap: 20px;
+  gap: 18px;
 }
 .modal-radio-group label {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 14px;
+  gap: 8px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
-/* Helper text under fields. Was inline `style={{}}` in five places. */
 .modal-hint {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 3px;
   display: block;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .modal-hint code {
-  font-family: 'SF Mono', 'Consolas', monospace;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
   background: var(--bg-deep);
   padding: 1px 4px;
   border-radius: 3px;
+  font-size: var(--text-2xs);
 }
 
 .modal-progress {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px 0;
+  gap: 9px;
+  padding: 14px 0;
 }
 .modal-progress-row {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .progress-bar-track {
   width: 100%;
-  height: 7px;
+  height: 6px;
   background: var(--bg-deep);
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
 }
 .progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-hover));
-  border-radius: 4px;
+  border-radius: 3px;
   transition: width 200ms var(--ease-out);
 }
 
 .modal-error {
   color: var(--accent);
-  font-size: 13px;
+  font-size: var(--text-xs);
   background: var(--accent-soft-bg);
   border: 1px solid var(--accent-soft-border);
-  border-radius: 4px;
-  padding: 10px 12px;
-  line-height: 1.4;
+  border-radius: 5px;
+  padding: 9px 12px;
+  line-height: 1.45;
 }
 
-/* ── Spinner (kept for non-progress async work) ──────────────────────────── */
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
@@ -893,15 +941,15 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 .settings-slider-bound {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  min-width: 26px;
+  min-width: 24px;
   text-align: center;
-  font-family: 'SF Mono', 'Consolas', monospace;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
 }
 
 .settings-slider {
@@ -910,52 +958,54 @@ html, body, #root {
   cursor: pointer;
 }
 
-/* CRF slider with anchored labels under the track. */
 .crf-marks {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  color: var(--text-faint);
   margin-top: 2px;
-  font-family: 'SF Mono', 'Consolas', monospace;
-  letter-spacing: 0.02em;
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
+  letter-spacing: 0.03em;
 }
 
-/* ── Range input — chunkier thumb for better usability ───────────────────── */
+/* ── Range input ─────────────────────────────────────────────────────────── */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 8px;
+  height: 6px;
   background: var(--bg-deep);
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   margin-top: -6px;
   background: var(--accent);
   border: 2px solid var(--bg-toolbar);
   border-radius: 50%;
   cursor: pointer;
-  transition: transform 140ms var(--ease-out);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 130ms var(--ease-out), box-shadow 130ms var(--ease-out);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
 }
-input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.1); }
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px color-mix(in oklch, var(--accent) 50%, transparent);
+}
 input[type="range"]::-moz-range-track {
-  height: 8px;
+  height: 6px;
   background: var(--bg-deep);
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   background: var(--accent);
   border: 2px solid var(--bg-toolbar);
   border-radius: 50%;
