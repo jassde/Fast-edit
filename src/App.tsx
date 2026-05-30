@@ -1,7 +1,7 @@
 import './App.css'
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { formatTime } from './utils'
-import { open } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
@@ -10,13 +10,15 @@ import { useAppState } from './hooks/useAppState'
 import { useMpv } from './hooks/useMpv'
 import { useFileDrop } from './hooks/useFileDrop'
 import { useKeyboard } from './hooks/useKeyboard'
+import { useShortcuts } from './hooks/useShortcuts'
 import { useWheelSeek } from './hooks/useWheelSeek'
-import { HwSupport } from './types'
+import { HwSupport, ProjectFile } from './types'
 
 import { PlaybackControls } from './components/PlaybackControls'
 import { Timeline } from './components/Timeline'
 import { ExportModal } from './components/ExportModal'
 import { SettingsModal } from './components/SettingsModal'
+import { ShortcutsModal } from './components/ShortcutsModal'
 
 type ScrollSettingsChangePayload = { kind: 'frames' | 'seconds'; value: number }
 
@@ -47,8 +49,12 @@ export default function App() {
 
   const isDragOver = useFileDrop(handleFileDrop)
 
+  // Rebindable keyboard shortcuts
+  const shortcuts = useShortcuts()
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false)
+
   // Global keyboard shortcuts
-  useKeyboard(state, actions, playback)
+  useKeyboard(state, actions, playback, shortcuts.keyToAction, showShortcutsModal)
 
   // Global scroll-wheel seeking (works anywhere in the window, not just the timeline)
   useWheelSeek(state, actions, playback)
@@ -63,6 +69,70 @@ export default function App() {
       actions.setFilePath(selected)
     }
   }, [actions])
+
+  // ── Save / Load project ────────────────────────────────────────────────
+  // Project files (.vtproj.json) persist filePath + segments + playhead so a
+  // session can be resumed later. Default dir is Documents\Video Trimmer\saves.
+  const pendingSeekRef = useRef<number | null>(null)
+
+  const handleSaveProject = useCallback(async () => {
+    if (!state.filePath) return
+    let defaultDir = ''
+    try {
+      defaultDir = await invoke<string>('default_save_dir')
+    } catch { /* fall through with empty default */ }
+    const baseName = state.filePath.replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '')
+    const suggested = defaultDir
+      ? `${defaultDir}\\${baseName || 'untitled'}.vtproj.json`
+      : `${baseName || 'untitled'}.vtproj.json`
+    const target = await save({
+      defaultPath: suggested,
+      filters: [{ name: 'Video Trimmer Project', extensions: ['vtproj.json', 'json'] }],
+    })
+    if (!target) return
+    const project: ProjectFile = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      filePath: state.filePath,
+      duration: state.duration,
+      playheadPosition: state.playheadPosition,
+      segments: state.segments,
+    }
+    try {
+      await invoke('save_project', { path: target, project })
+    } catch (e) {
+      console.error('Save failed:', e)
+    }
+  }, [state.filePath, state.duration, state.playheadPosition, state.segments])
+
+  const handleLoadProject = useCallback(async () => {
+    let defaultDir: string | undefined
+    try {
+      defaultDir = await invoke<string>('default_save_dir')
+    } catch { /* ignore */ }
+    const picked = await open({
+      multiple: false,
+      defaultPath: defaultDir,
+      filters: [{ name: 'Video Trimmer Project', extensions: ['vtproj.json', 'json'] }],
+    })
+    if (!picked || typeof picked !== 'string') return
+    try {
+      const project = await invoke<ProjectFile>('load_project', { path: picked })
+      pendingSeekRef.current = project.playheadPosition
+      actions.loadProject(project)
+    } catch (e) {
+      console.error('Load failed:', e)
+    }
+  }, [actions])
+
+  // Apply the pending seek once mpv reports a duration for the loaded file.
+  useEffect(() => {
+    if (pendingSeekRef.current === null || state.duration <= 0) return
+    const pos = pendingSeekRef.current
+    pendingSeekRef.current = null
+    playback.seek(pos)
+    actions.setPlayheadPosition(pos)
+  }, [state.duration, playback, actions])
 
   // Cross-window: load a video file emitted by the downloader window.
   // Uses the aborted-flag pattern (mirrors useMpv) to handle the StrictMode
@@ -296,18 +366,24 @@ export default function App() {
             •••
           </button>
           <div className={`top-bar-dropdown-menu${showDropdown ? ' open' : ''}`} role="menu">
-            <button className="dropdown-item" role="menuitem" aria-label="Keyboard shortcuts" onClick={() => setShowDropdown(false)}>
+            <button className="dropdown-item" role="menuitem" aria-label="Keyboard shortcuts" onClick={() => { setShowDropdown(false); setShowShortcutsModal(true) }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M14 5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM2 4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
                 <path d="M13 10.25a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm0-2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-5 0A.25.25 0 0 1 8.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 8 8.75zm2 0a.25.25 0 0 1 .25-.25h1.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-1.5a.25.25 0 0 1-.25-.25zm1 2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-5-2A.25.25 0 0 1 6.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 6 8.75zm-2 0A.25.25 0 0 1 4.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 4 8.75zm-2 0A.25.25 0 0 1 2.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 2 8.75zm11-2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-2 0a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-2 0A.25.25 0 0 1 9.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 9 6.75zm-2 0A.25.25 0 0 1 7.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 7 6.75zm-2 0A.25.25 0 0 1 5.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 5 6.75zm-3 0A.25.25 0 0 1 2.25 6h1.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-1.5A.25.25 0 0 1 2 6.75zm0 4a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm2 0a.25.25 0 0 1 .25-.25h5.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-5.5a.25.25 0 0 1-.25-.25z"/>
               </svg>
               <span>Shortcuts</span>
             </button>
-            <button className="dropdown-item" role="menuitem" aria-label="Save" onClick={() => setShowDropdown(false)}>
+            <button className="dropdown-item" role="menuitem" aria-label="Save project" disabled={!state.filePath} onClick={() => { setShowDropdown(false); handleSaveProject() }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M0 1a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm4 0v6h8V1zm8 8H4v6h8zM1 1v2h2V1zm2 3H1v2h2zM1 7v2h2V7zm2 3H1v2h2zm-2 3v2h2v-2zM15 1h-2v2h2zm-2 3v2h2V4zm2 3h-2v2h2zm-2 3v2h2v-2zm2 3h-2v2h2z"/>
               </svg>
               <span>Save</span>
+            </button>
+            <button className="dropdown-item" role="menuitem" aria-label="Load project" onClick={() => { setShowDropdown(false); handleLoadProject() }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.826a2 2 0 0 1-1.991-1.819l-.637-7a2 2 0 0 1 .342-1.31zM2.19 4a1 1 0 0 0-.996 1.09l.637 7a1 1 0 0 0 .995.91h10.348a1 1 0 0 0 .995-.91l.637-7A1 1 0 0 0 13.81 4zm4.69-1.707A1 1 0 0 0 6.172 2H2.5a1 1 0 0 0-1 .981l.006.139q.323-.119.684-.12h5.396z"/>
+              </svg>
+              <span>Load</span>
             </button>
             <button className="dropdown-item" role="menuitem" aria-label="Input time codes" onClick={() => setShowDropdown(false)}>
               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
@@ -435,6 +511,16 @@ export default function App() {
           onClose={actions.closeExportModal}
           onExportComplete={actions.closeExportModal}
           onExportError={actions.setExportError}
+        />
+      )}
+
+      {/* ── Shortcuts modal ── */}
+      {showShortcutsModal && (
+        <ShortcutsModal
+          bindings={shortcuts.bindings}
+          onRebind={shortcuts.setBinding}
+          onReset={shortcuts.reset}
+          onClose={() => setShowShortcutsModal(false)}
         />
       )}
 

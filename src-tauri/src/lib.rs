@@ -1,4 +1,5 @@
 mod ffmpeg;
+mod project;
 mod ytdlp;
 
 use std::sync::Mutex;
@@ -44,6 +45,9 @@ pub fn run() {
             ytdlp::get_temp_dir,
             ytdlp::clear_temp_dir,
             ytdlp::focus_main_window,
+            project::default_save_dir,
+            project::save_project,
+            project::load_project,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

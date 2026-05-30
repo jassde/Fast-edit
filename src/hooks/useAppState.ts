@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { Segment, HwEncoder } from '../types'
+import { Segment, HwEncoder, ProjectFile } from '../types'
 import { clamp, newId, pickColor } from '../utils'
 import {
   MIN_FRAME_GAP_S,
@@ -121,6 +121,7 @@ export type AppActions = {
   setShowScrollPanel: (b: boolean) => void
   setMpvError: (msg: string | null) => void
   setExportError: (msg: string | null) => void
+  loadProject: (p: ProjectFile) => void
 }
 
 // ── Initial state ─────────────────────────────────────────────────────────────
@@ -305,6 +306,20 @@ export function useAppState(): [AppState, AppActions] {
   const setMpvError         = useCallback((msg: string | null) => setState(s => ({ ...s, mpvError: msg })), [])
   const setExportError      = useCallback((msg: string | null) => setState(s => ({ ...s, exportError: msg })), [])
 
+  const loadProject = useCallback((p: ProjectFile) => {
+    setState(s => ({
+      ...s,
+      filePath: p.filePath,
+      segments: p.segments,
+      selectedSegmentId: null,
+      playheadPosition: p.playheadPosition,
+      duration: 0,
+      fps: DEFAULT_FPS,
+      isPlaying: false,
+      mpvError: null,
+    }))
+  }, [])
+
   const setFramesPerScrollTick = useCallback((n: number) => {
     setState(s => {
       const next = { ...s, framesPerScrollTick: n }
@@ -361,6 +376,7 @@ export function useAppState(): [AppState, AppActions] {
     setShowScrollPanel,
     setMpvError,
     setExportError,
+    loadProject,
   }), [
     setFilePath, setDuration, setFps, setPlayheadPosition, setIsPlaying, setIsMuted,
     addSegment, deleteSegment, selectSegment,
@@ -368,7 +384,7 @@ export function useAppState(): [AppState, AppActions] {
     openExportModal, closeExportModal,
     openSettingsModal, closeSettingsModal,
     setFramesPerScrollTick, setSecondsPerShiftScrollTick, setHwEncoder, setShowScrollPanel,
-    setMpvError, setExportError,
+    setMpvError, setExportError, loadProject,
   ])
 
   return [state, actions] as const

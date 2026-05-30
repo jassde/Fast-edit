@@ -59,6 +59,15 @@ export type YtdlpProgress = {
   eta: string      // e.g. "00:45"
 }
 
+export type ProjectFile = {
+  version: number
+  savedAt: string
+  filePath: string
+  duration: number
+  playheadPosition: number
+  segments: Segment[]
+}
+
 export type YtdlpConfig = {
   ytdlpPath: string  // absolute path to yt-dlp.exe; empty string if not set
   tempDir: string    // absolute path to the Temp download folder

@@ -887,6 +887,43 @@ html, body, #root {
   font-size: var(--text-2xs);
 }
 
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 8px;
+}
+.shortcuts-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.shortcuts-label {
+  color: var(--text);
+}
+.shortcuts-key-cell {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+.shortcuts-key-btn {
+  font-family: 'DM Mono', 'SF Mono', 'Consolas', monospace;
+  background: var(--bg-deep);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  min-width: 80px;
+}
+.shortcuts-key-btn:hover {
+  border-color: var(--accent);
+}
+.shortcuts-key-btn.capturing {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .modal-progress {
   display: flex;
   flex-direction: column;
