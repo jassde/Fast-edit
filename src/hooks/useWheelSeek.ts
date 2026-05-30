@@ -21,7 +21,7 @@ type PlaybackCommands = {
  *
  * Suppressed when:
  * - No file is loaded (duration === 0).
- * - A modal is open (export or settings) — so the modal's own scrollable areas
+ * - A modal is open (export, settings, or shortcuts) — so the modal's own scrollable areas
  *   (e.g. the segment checklist) behave normally.
  * - Focus/hover target is an <input>, <select>, or <textarea> (sliders, etc.).
  */
