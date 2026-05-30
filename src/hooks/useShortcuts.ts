@@ -73,7 +73,15 @@ export function useShortcuts() {
 
   const setBinding = useCallback((action: ShortcutAction, key: string) => {
     setBindings(prev => {
+      // Find if this key is already owned by a different action
+      const displaced = (Object.keys(prev) as ShortcutAction[])
+        .find(k => k !== action && normaliseKey(prev[k]) === normaliseKey(key))
+
       const next = { ...prev, [action]: key }
+      if (displaced) {
+        // Give the displaced action the key that `action` was using
+        next[displaced] = prev[action]
+      }
       persist(next)
       return next
     })
