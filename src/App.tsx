@@ -1,5 +1,6 @@
 import './App.css'
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
+import { formatTime } from './utils'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
@@ -210,6 +211,25 @@ export default function App() {
     actions.setIsMuted(next)
   }, [playback, actions, state.isMuted])
 
+  // Top-bar centre dropdown — click-toggled, closes on Escape or outside click.
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!showDropdown) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowDropdown(false) }
+    const onPointer = (e: PointerEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onPointer)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onPointer)
+    }
+  }, [showDropdown])
+
   // Timeline zoom — local UI state, not persisted across sessions. 1 = fit
   // entire video; higher values show a window of `duration / zoom` seconds
   // centered on the playhead.
@@ -251,58 +271,75 @@ export default function App() {
       {/* ── Top bar ── */}
       <div className="top-bar">
         <span className="app-title">Video Trimmer</span>
+        <div className="top-bar-sep" />
         <button className="btn btn-chrome" onClick={handleOpenFile}>
           Open File
         </button>
 
+        {state.duration > 0 && (
+          <span className="top-bar-time" title="Current position / total duration">
+            <span>{formatTime(state.playheadPosition)}</span>
+            <span className="sep">/</span>
+            <span className="total">{formatTime(state.duration)}</span>
+          </span>
+        )}
+
         {/* ── Centre dropdown ── */}
-        <div className="top-bar-dropdown">
-          <button className="btn btn-chrome top-bar-dropdown-trigger" aria-label="Menu" aria-haspopup="true">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
-            </svg>
+        <div className="top-bar-dropdown" ref={dropdownRef}>
+          <button
+            className="btn btn-chrome top-bar-dropdown-trigger"
+            aria-label="Menu"
+            aria-haspopup="true"
+            aria-expanded={showDropdown}
+            onClick={() => setShowDropdown(v => !v)}
+          >
+            •••
           </button>
-          <div className="top-bar-dropdown-menu" role="menu">
-            {/* Row 1 */}
-            <button className="dropdown-item" role="menuitem" aria-label="Keyboard shortcuts">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+          <div className={`top-bar-dropdown-menu${showDropdown ? ' open' : ''}`} role="menu">
+            <button className="dropdown-item" role="menuitem" aria-label="Keyboard shortcuts" onClick={() => setShowDropdown(false)}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M14 5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM2 4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
                 <path d="M13 10.25a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm0-2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-5 0A.25.25 0 0 1 8.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 8 8.75zm2 0a.25.25 0 0 1 .25-.25h1.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-1.5a.25.25 0 0 1-.25-.25zm1 2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-5-2A.25.25 0 0 1 6.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 6 8.75zm-2 0A.25.25 0 0 1 4.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 4 8.75zm-2 0A.25.25 0 0 1 2.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 2 8.75zm11-2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-2 0a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-2 0A.25.25 0 0 1 9.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 9 6.75zm-2 0A.25.25 0 0 1 7.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 7 6.75zm-2 0A.25.25 0 0 1 5.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 5 6.75zm-3 0A.25.25 0 0 1 2.25 6h1.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-1.5A.25.25 0 0 1 2 6.75zm0 4a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm2 0a.25.25 0 0 1 .25-.25h5.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-5.5a.25.25 0 0 1-.25-.25z"/>
               </svg>
+              <span>Shortcuts</span>
             </button>
-            <button className="dropdown-item" role="menuitem" aria-label="Save">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <button className="dropdown-item" role="menuitem" aria-label="Save" onClick={() => setShowDropdown(false)}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M0 1a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm4 0v6h8V1zm8 8H4v6h8zM1 1v2h2V1zm2 3H1v2h2zM1 7v2h2V7zm2 3H1v2h2zm-2 3v2h2v-2zM15 1h-2v2h2zm-2 3v2h2V4zm2 3h-2v2h2zm-2 3v2h2v-2zm2 3h-2v2h2z"/>
               </svg>
+              <span>Save</span>
             </button>
-            <button className="dropdown-item" role="menuitem" aria-label="Input time codes">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <button className="dropdown-item" role="menuitem" aria-label="Input time codes" onClick={() => setShowDropdown(false)}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M2.5 15a.5.5 0 1 1 0-1h1v-1a4.5 4.5 0 0 1 2.557-4.06c.29-.139.443-.377.443-.59v-.7c0-.213-.154-.451-.443-.59A4.5 4.5 0 0 1 3.5 3V2h-1a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1h-1v1a4.5 4.5 0 0 1-2.557 4.06c-.29.139-.443.377-.443.59v.7c0 .213.154.451.443.59A4.5 4.5 0 0 1 12.5 13v1h1a.5.5 0 0 1 0 1zm2-13v1c0 .537.12 1.045.337 1.5h6.326c.216-.455.337-.963.337-1.5V2zm3 6.35c0 .701-.478 1.236-1.011 1.492A3.5 3.5 0 0 0 4.5 13s.866-1.299 3-1.48zm1 0v3.17c2.134.181 3 1.48 3 1.48a3.5 3.5 0 0 0-1.989-3.158C8.978 9.586 8.5 9.052 8.5 8.351z"/>
               </svg>
+              <span>Times</span>
             </button>
-            {/* Row 2 */}
-            <button className="dropdown-item" role="menuitem" aria-label="Download video" onClick={openDownloaderWindow}>
-              <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <button className="dropdown-item" role="menuitem" aria-label="Download video" onClick={() => { openDownloaderWindow(); setShowDropdown(false) }}>
+              <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path d="M8 12l-5-5h3V2h4v5h3L8 12z"/>
                 <rect x="2" y="13" width="12" height="1.5" rx="0.75"/>
               </svg>
+              <span>Download</span>
             </button>
-            <button className="dropdown-item" role="menuitem" aria-label="Scroll step settings" aria-pressed={state.showScrollPanel} onClick={() => actions.setShowScrollPanel(!state.showScrollPanel)}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <button className="dropdown-item" role="menuitem" aria-label="Scroll step settings" aria-pressed={state.showScrollPanel} onClick={() => { actions.setShowScrollPanel(!state.showScrollPanel); setShowDropdown(false) }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M3 5a5 5 0 0 1 10 0v6a5 5 0 0 1-10 0zm5.5-1.5a.5.5 0 0 0-1 0v2a.5.5 0 0 0 1 0z"/>
               </svg>
+              <span>Scroll</span>
             </button>
-            <button className="dropdown-item" role="menuitem" aria-label="Settings" onClick={actions.openSettingsModal}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <button className="dropdown-item" role="menuitem" aria-label="Settings" onClick={() => { actions.openSettingsModal(); setShowDropdown(false) }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
                 <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
               </svg>
+              <span>Settings</span>
             </button>
           </div>
         </div>
 
         <button
-          className="btn btn-primary"
+          className="btn btn-primary btn-export"
           style={{ marginLeft: 'auto' }}
           disabled={state.segments.length === 0 || state.duration === 0}
           onClick={actions.openExportModal}
@@ -314,6 +351,7 @@ export default function App() {
             <path d="M0 1.5A.5.5 0 0 1 .5 1h1a.5.5 0 0 1 .5.5V4h13.5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5H2v2.5a.5.5 0 0 1-1 0V2H.5a.5.5 0 0 1-.5-.5m5.5 4a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M9 8a2.5 2.5 0 1 0 5 0 2.5 2.5 0 0 0-5 0"/>
             <path d="M3 12.5h3.5v1a.5.5 0 0 1-.5.5H3.5a.5.5 0 0 1-.5-.5zm4 1v-1h4v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5"/>
           </svg>
+          <span>Export</span>
         </button>
       </div>
 
@@ -341,7 +379,6 @@ export default function App() {
 
       {/* ── Unified control bar (transport + segment edit/nav + zoom) ── */}
       <PlaybackControls
-        currentTime={state.playheadPosition}
         duration={state.duration}
         isPlaying={state.isPlaying}
         isMuted={state.isMuted}

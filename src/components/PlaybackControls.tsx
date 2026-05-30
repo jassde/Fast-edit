@@ -1,8 +1,5 @@
-import { formatTime } from '../utils'
-
 type PlaybackControlsProps = {
   // transport
-  currentTime: number
   duration: number
   isPlaying: boolean
   isMuted: boolean
@@ -44,13 +41,13 @@ const IconFrameFwd = () => (
 )
 const IconPlay = () => (
   <svg viewBox="0 0 16 16" aria-hidden="true">
-    <polygon points="3,2 13,8 3,14" />
+    <polygon points="3.5,2.5 13,8 3.5,13.5" />
   </svg>
 )
 const IconPause = () => (
   <svg viewBox="0 0 16 16" aria-hidden="true">
-    <rect x="3" y="3" width="3.5" height="10" />
-    <rect x="9.5" y="3" width="3.5" height="10" />
+    <rect x="3.5" y="3" width="3" height="10" rx="1" />
+    <rect x="9.5" y="3" width="3" height="10" rx="1" />
   </svg>
 )
 const IconVolume = () => (
@@ -67,9 +64,23 @@ const IconMuted = () => (
     <line x1="15" y1="5.5" x2="11" y2="10.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
   </svg>
 )
+const IconAdd = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <line x1="8" y1="3" x2="8" y2="13" />
+    <line x1="3" y1="8" x2="13" y2="8" />
+  </svg>
+)
+const IconTrash = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 4.5 H13" />
+    <path d="M6 4.5 V3 H10 V4.5" />
+    <path d="M4.5 4.5 L5.2 13 H10.8 L11.5 4.5" />
+    <line x1="7" y1="7" x2="7" y2="11" />
+    <line x1="9" y1="7" x2="9" y2="11" />
+  </svg>
+)
 
 export function PlaybackControls({
-  currentTime,
   duration,
   isPlaying,
   isMuted,
@@ -95,43 +106,50 @@ export function PlaybackControls({
   return (
     <div className="playback-controls">
 
-      {/* ── Left: segment editing ── */}
+      {/* ── Left: Add / Delete, then Set In / Set Out ── */}
       <div className="pc-group pc-group--left">
         <button
-          className="btn btn-wide"
+          className="btn btn-icon btn-add-delete"
           disabled={!hasFile}
           onClick={onAddSegment}
           title="Add a new 5-second segment at the playhead position"
+          aria-label="Add segment"
         >
-          + Add
+          <IconAdd />
         </button>
         <button
-          className="btn btn-danger btn-wide"
+          className="btn btn-icon btn-add-delete btn-danger-icon"
           disabled={!hasSelected}
           onClick={onDeleteSegment}
           title="Delete selected segment (Delete)"
+          aria-label="Delete segment"
         >
-          Delete
+          <IconTrash />
         </button>
-        <button
-          className="btn btn-wide"
-          disabled={!hasSelected || !hasFile}
-          onClick={onSetStart}
-          title="Set start of selected segment to playhead (I)"
-        >
-          Set In
-        </button>
-        <button
-          className="btn btn-wide"
-          disabled={!hasSelected || !hasFile}
-          onClick={onSetEnd}
-          title="Set end of selected segment to playhead (O)"
-        >
-          Set Out
-        </button>
+
+        <div className="pc-inout">
+          <button
+            className="btn btn-inout"
+            disabled={!hasSelected || !hasFile}
+            onClick={onSetStart}
+            title="Set start of selected segment to playhead (I)"
+            aria-label="Set in point"
+          >
+            In
+          </button>
+          <button
+            className="btn btn-inout"
+            disabled={!hasSelected || !hasFile}
+            onClick={onSetEnd}
+            title="Set end of selected segment to playhead (O)"
+            aria-label="Set out point"
+          >
+            Out
+          </button>
+        </div>
       </div>
 
-      {/* ── Center: transport ── */}
+      {/* ── Center: pure transport — absolutely locked to horizontal center ── */}
       <div className="pc-group pc-group--center">
         <button
           className="btn btn-icon"
@@ -144,12 +162,11 @@ export function PlaybackControls({
         </button>
 
         <button
-          className="btn btn-primary btn-icon btn-icon-lg"
+          className="btn btn-primary btn-icon btn-icon-lg btn-play-lg"
           disabled={!hasFile}
           onClick={isPlaying ? onPause : onPlay}
           title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          style={{ minWidth: 44 }}
         >
           {isPlaying ? <IconPause /> : <IconPlay />}
         </button>
@@ -163,13 +180,10 @@ export function PlaybackControls({
         >
           <IconFrameFwd />
         </button>
+      </div>
 
-        <span className="time-display" title="Current position / total duration">
-          {formatTime(currentTime)}
-          <span className="sep">/</span>
-          <span className="total">{formatTime(duration)}</span>
-        </span>
-
+      {/* ── Right: mute, segment nav, zoom ── */}
+      <div className="pc-group pc-group--right">
         <button
           className="btn btn-icon"
           disabled={!hasFile}
@@ -180,14 +194,13 @@ export function PlaybackControls({
         >
           {isMuted ? <IconMuted /> : <IconVolume />}
         </button>
-      </div>
 
-      {/* ── Right: segment nav + zoom ── */}
-      <div className="pc-group pc-group--right">
+        <div className="pc-sep" />
+
         <span className="segment-indicator" title="Currently selected segment">
           {segmentCount === 0
             ? '– / 0'
-            : `${selectedSegmentNumber ?? '–'} / ${segmentCount}`}
+            : <><b>{selectedSegmentNumber ?? '–'}</b>{' / '}{segmentCount}</>}
         </span>
 
         <button
@@ -200,6 +213,9 @@ export function PlaybackControls({
           ▸
         </button>
 
+        <div className="pc-sep" />
+
+        <span className="pc-label">Zoom</span>
         <input
           type="range"
           className="timeline-zoom-slider"
@@ -217,3 +233,4 @@ export function PlaybackControls({
     </div>
   )
 }
+

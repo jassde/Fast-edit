@@ -1,15 +1,13 @@
 /* ── Downloader & Modal styles ─────────────────────────────────────────────
-   Improved spacing, typography, interactions, and visual hierarchy        */
+   SCOPING NOTE: Any rule touching a class name that also appears in App.css
+   (.btn, .top-bar, .modal-*, .progress-bar-*, .app-title, etc.) MUST be
+   scoped to .downloader-window so it doesn't override the main window's
+   styles via Vite's global CSS bundle.  Only dl-* and downloader-specific
+   structural classes are safe to leave unscoped.
+   ========================================================================= */
 
 /* =========================================================================
    Global / window
-   -------------------------------------------------------------------------
-   Scoped to .downloader-window (added to <html> by main.tsx when hash is
-   #downloader). MUST NOT apply globally — App.css sets the main window's
-   body to `background: transparent` so libmpv can render behind the
-   WebView. A bare `html, body, #root { background: ... }` rule here would
-   leak into the main window via Vite's global CSS bundle and hide the
-   video.
    ========================================================================= */
 .downloader-window,
 .downloader-window body,
@@ -29,9 +27,9 @@
 }
 
 /* =========================================================================
-   Title bar (top-bar)
+   Title bar — scoped so it doesn't override the 60px main window top-bar
    ========================================================================= */
-.top-bar {
+.downloader-window .top-bar {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -39,13 +37,22 @@
   background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  /* reset the height the main window now sets */
+  height: auto;
+  position: static;
 }
 
-.app-title {
+.downloader-window .app-title {
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.2px;
   color: var(--text-primary);
+  /* remove the accent chip added to the main window title */
+  display: inline-flex;
+  text-transform: none;
+}
+.downloader-window .app-title::before {
+  display: none;
 }
 
 /* =========================================================================
@@ -61,22 +68,23 @@
 }
 
 /* =========================================================================
-   Form fields (consistent across downloader & modal)
+   Form fields — scoped to avoid overriding Export/Settings modal fields
    ========================================================================= */
-.modal-field {
+.downloader-window .modal-field {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.modal-label {
+.downloader-window .modal-label {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.2px;
+  text-transform: none;
 }
 
-.modal-input {
+.downloader-window .modal-input {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -87,24 +95,24 @@
   transition: border 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
 }
 
-.modal-input:focus {
+.downloader-window .modal-input:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft-bg);
 }
 
-.modal-input:disabled {
+.downloader-window .modal-input:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.modal-row {
+.downloader-window .modal-row {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.modal-hint {
+.downloader-window .modal-hint {
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -166,17 +174,18 @@
 }
 
 /* =========================================================================
-   Progress bar
+   Progress bar — scoped so it doesn't override the export modal's bar
    ========================================================================= */
-.progress-bar-track {
+.downloader-window .progress-bar-track {
   background: var(--bg-active);
   border-radius: 20px;
   height: 6px;
   overflow: hidden;
   width: 100%;
+  border: none;
 }
 
-.progress-bar-fill {
+.downloader-window .progress-bar-fill {
   background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 70%, white));
   width: 0%;
   height: 100%;
@@ -186,8 +195,8 @@
 }
 
 @keyframes progressPulse {
-  0% { opacity: 0.9; }
-  50% { opacity: 1; }
+  0%   { opacity: 0.9; }
+  50%  { opacity: 1; }
   100% { opacity: 0.9; }
 }
 
@@ -243,8 +252,8 @@
 
 /* Warning banner (missing yt-dlp) */
 .warning-banner {
-  background: color-mix(in srgb, var(--accent-warning) 10%, transparent);
-  border-left: 4px solid var(--accent-warning);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-left: 4px solid var(--danger);
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 12px;
@@ -298,14 +307,14 @@
 }
 
 /* =========================================================================
-   Buttons (consistent)
+   Buttons — scoped so they don't override the main window's bigger buttons
    ========================================================================= */
-.btn {
+.downloader-window .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 7px 16px;
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -314,65 +323,69 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 160ms var(--ease-out);
+  transition: background 160ms var(--ease-out), color 160ms var(--ease-out),
+              border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
   white-space: nowrap;
+  min-height: unset;
 }
 
-.btn:hover:not(:disabled) {
+.downloader-window .btn:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--accent-soft-border);
   transform: translateY(-1px);
 }
 
-.btn:active:not(:disabled) {
+.downloader-window .btn:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.btn-primary {
+.downloader-window .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: #1d1d1d;
 }
 
-.btn-primary:hover:not(:disabled) {
+.downloader-window .btn-primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 85%, black);
   border-color: color-mix(in srgb, var(--accent) 85%, black);
 }
 
-.btn-danger {
-  border-color: var(--accent-warning);
-  color: var(--accent-warning);
+.downloader-window .btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
   background: transparent;
 }
 
-.btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+.downloader-window .btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
-.btn-chrome {
+.downloader-window .btn-chrome {
   background: var(--bg-toolbar);
   border-color: var(--border);
 }
 
-.btn:disabled {
+.downloader-window .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
-.btn-icon {
+.downloader-window .btn-icon {
   padding: 6px;
   aspect-ratio: 1;
   font-size: 16px;
   line-height: 1;
+  min-height: unset;
+  min-width: unset;
 }
 
 /* =========================================================================
    Error & feedback
    ========================================================================= */
-.modal-error {
-  background: color-mix(in srgb, var(--accent-warning) 8%, transparent);
-  border-left: 3px solid var(--accent-warning);
+.downloader-window .modal-error {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-left: 3px solid var(--danger);
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 12px;
@@ -380,9 +393,9 @@
 }
 
 /* =========================================================================
-   Modal specific (overlay, card)
+   Modal specific (overlay, card) — scoped
    ========================================================================= */
-.modal-overlay {
+.downloader-window .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -397,9 +410,6 @@
   padding: 16px;
 }
 
-/* Scoped to the downloader window — avoids overriding App.css's .modal in
-   the main window (Vite bundles all CSS globally; bare .modal would win
-   over App.css's rule and make the export/settings modals too dark). */
 .downloader-window .modal {
   background: var(--bg-deep);
   border-radius: 24px;
@@ -413,14 +423,14 @@
   gap: 20px;
 }
 
-.modal-header {
+.downloader-window .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
 }
 
-.modal-title {
+.downloader-window .modal-title {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.3px;
@@ -444,14 +454,18 @@
   color: var(--text-primary);
 }
 
-.modal-footer {
+.downloader-window .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
 }
 
-/* Responsive touch-ups */
+/* =========================================================================
+   Responsive touch-ups
+   ========================================================================= */
 @media (max-width: 550px) {
   .dl-body {
     padding: 16px;
@@ -464,7 +478,7 @@
   .dl-footer-actions-left {
     justify-content: stretch;
   }
-  .btn {
+  .downloader-window .btn {
     flex: 1;
     justify-content: center;
   }
