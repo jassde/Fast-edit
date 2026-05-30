@@ -20,7 +20,7 @@ export function useFileDrop(onFileDrop: (path: string) => void): boolean {
 
   useEffect(() => {
     // Not available outside the Tauri runtime (e.g. plain-browser preview).
-    if (typeof window.__TAURI_INTERNALS__ === 'undefined') return
+    if (!('__TAURI_INTERNALS__' in window)) return
 
     let aborted  = false
     let unlisten: (() => void) | null = null
