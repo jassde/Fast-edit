@@ -291,19 +291,30 @@
 .dl-footer-hint {
   border-top: 1px solid var(--border);
   padding-top: 12px;
-  font-size: 11px;
-  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.temp-path {
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+.dl-temp-label {
   font-size: 11px;
-  background: var(--bg-deep);
-  padding: 4px 8px;
-  border-radius: 6px;
-  display: inline-block;
-  margin-top: 4px;
-  word-break: break-all;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dl-temp-path-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dl-temp-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 5px 10px;
 }
 
 /* =========================================================================
@@ -390,6 +401,8 @@
   border-radius: 8px;
   font-size: 12px;
   color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* =========================================================================
@@ -485,4 +498,159 @@
   .downloader-window .modal {
     padding: 20px;
   }
+}
+
+/* =========================================================================
+   Cookie source section
+   ========================================================================= */
+.dl-cookie-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dl-cookie-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.dl-cookie-radio input[type="radio"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.downloader-window .dl-cookie-select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  margin-left: 23px;
+  transition: border-color 160ms var(--ease-out);
+}
+
+.downloader-window .dl-cookie-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.dl-cookie-browser-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 23px;
+}
+
+.dl-cookie-profile {
+  font-size: 12px;
+}
+
+.dl-cookie-file-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: 23px;
+}
+
+.dl-cookie-file-row .modal-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.dl-cookie-saving {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* =========================================================================
+   Format picker table
+   ========================================================================= */
+.dl-format-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dl-format-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: auto;
+}
+
+.dl-format-table thead th {
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.dl-format-table thead th:first-child { border-radius: 7px 0 0 0; }
+.dl-format-table thead th:last-child  { border-radius: 0 7px 0 0; }
+
+.dl-fmt-row {
+  cursor: pointer;
+  transition: background 120ms var(--ease-out);
+}
+
+.dl-fmt-row:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.dl-fmt-row.is-selected {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.dl-fmt-row.is-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.dl-fmt-row + .dl-fmt-row {
+  border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.dl-format-table tbody td {
+  padding: 6px 10px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.dl-fmt-check {
+  width: 22px;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.dl-fmt-special {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.dl-fmt-size {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dl-fmt-muted {
+  color: var(--text-muted);
 }

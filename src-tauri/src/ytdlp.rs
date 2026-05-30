@@ -1,27 +1,45 @@
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     fs,
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Command, Stdio},
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+// ── Cookie source ─────────────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CookieSource {
+    #[default]
+    None,
+    /// `browser` is the yt-dlp browser name (e.g. "chrome").
+    /// `profile` is the optional profile name appended as `browser:profile`
+    /// (e.g. "chrome:Default"). Empty string means use the default profile.
+    Browser { browser: String, #[serde(default)] profile: String },
+    File    { path: String },
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 pub struct YtdlpState {
-    pub ytdlp_path: Option<PathBuf>,
-    pub temp_dir: PathBuf,
+    pub ytdlp_path:    Option<PathBuf>,
+    pub temp_dir:      PathBuf,
+    pub cookie_source: CookieSource,
 }
 
 // ── Config file on disk ───────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Default)]
 struct YtdlpConfigFile {
-    ytdlp_path: Option<String>,
+    ytdlp_path:    Option<String>,
+    temp_dir:      Option<String>,
+    #[serde(default)]
+    cookie_source: CookieSource,
 }
 
 fn config_file_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -53,13 +71,16 @@ pub fn init_state(app: &AppHandle) -> YtdlpState {
     let cfg = load_config(app);
     let ytdlp_path = cfg.ytdlp_path.map(PathBuf::from);
 
-    let temp_dir = app
-        .path()
-        .app_local_data_dir()
-        .map(|d| d.join("Temp"))
-        .unwrap_or_else(|_| PathBuf::from("Temp"));
+    let temp_dir = cfg.temp_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            app.path()
+                .app_local_data_dir()
+                .map(|d| d.join("Temp"))
+                .unwrap_or_else(|_| PathBuf::from("Temp"))
+        });
 
-    YtdlpState { ytdlp_path, temp_dir }
+    YtdlpState { ytdlp_path, temp_dir, cookie_source: cfg.cookie_source }
 }
 
 // ── Windows: suppress console window ─────────────────────────────────────────
@@ -81,10 +102,9 @@ pub fn get_ytdlp_config(
 ) -> Result<serde_json::Value, String> {
     let guard = state.lock().unwrap_or_else(|e| e.into_inner());
     Ok(serde_json::json!({
-        "ytdlpPath": guard.ytdlp_path.as_deref()
-            .and_then(|p| p.to_str())
-            .unwrap_or(""),
-        "tempDir": guard.temp_dir.to_string_lossy(),
+        "ytdlpPath":    guard.ytdlp_path.as_deref().and_then(|p| p.to_str()).unwrap_or(""),
+        "tempDir":      guard.temp_dir.to_string_lossy(),
+        "cookieSource": guard.cookie_source,
     }))
 }
 
@@ -123,11 +143,49 @@ pub fn save_ytdlp_path(
     }
 
     // Write config to disk BEFORE mutating in-memory state so a disk error
-    // leaves the previous value intact.
-    save_config(&app, &YtdlpConfigFile { ytdlp_path: Some(path) })?;
+    // leaves the previous value intact. Read existing config first to preserve
+    // cookie_source — constructing a fresh struct would zero it out.
+    let mut cfg = load_config(&app);
+    cfg.ytdlp_path = Some(path);
+    save_config(&app, &cfg)?;
 
     let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
     guard.ytdlp_path = Some(new_path);
+    Ok(())
+}
+
+/// Persists the cookie source selection and updates running state.
+#[tauri::command]
+pub fn save_cookie_settings(
+    cookie_source: CookieSource,
+    state: State<'_, Mutex<YtdlpState>>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let mut cfg = load_config(&app);
+    cfg.cookie_source = cookie_source.clone();
+    save_config(&app, &cfg)?;
+    let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
+    guard.cookie_source = cookie_source;
+    Ok(())
+}
+
+/// Validates the given path (creates it if needed), persists it as the temp
+/// directory, and updates running state so the next download uses it.
+#[tauri::command]
+pub fn save_temp_dir(
+    path: String,
+    state: State<'_, Mutex<YtdlpState>>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let new_path = PathBuf::from(&path);
+    fs::create_dir_all(&new_path).map_err(|e| format!("Cannot create directory: {e}"))?;
+
+    let mut cfg = load_config(&app);
+    cfg.temp_dir = Some(path);
+    save_config(&app, &cfg)?;
+
+    let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
+    guard.temp_dir = new_path;
     Ok(())
 }
 
@@ -140,30 +198,34 @@ pub async fn fetch_formats(
     url: String,
     state: State<'_, Mutex<YtdlpState>>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let ytdlp = {
+    let (ytdlp, cookie_source) = {
         let guard = state.lock().unwrap_or_else(|e| e.into_inner());
-        guard
+        let p = guard
             .ytdlp_path
             .clone()
-            .ok_or("yt-dlp path not set. Click the \u{2699} button to configure it.")?
+            .ok_or("yt-dlp path not set. Click the \u{2699} button to configure it.")?;
+        (p, guard.cookie_source.clone())
     };
 
     tauri::async_runtime::spawn_blocking(move || {
         let mut cmd = Command::new(&ytdlp);
         // `--` separates flags from the URL, preventing a URL starting with `-`
         // from being parsed as a yt-dlp option (e.g. `--exec`).
-        cmd.args(["-j", "--no-playlist", "--", &url])
+        cmd.args(["-j", "--no-playlist"])
+            .args(build_cookie_args(&cookie_source))
+            .args(["--", &url])
             .stdout(Stdio::piped())
-            .stderr(Stdio::null());
+            .stderr(Stdio::piped());
         hide_console(&mut cmd);
 
         let output = cmd
             .output()
             .map_err(|e| format!("Failed to run yt-dlp: {e}"))?;
         if !output.status.success() {
-            return Err(
-                "yt-dlp failed to fetch video info. Check the URL and try again.".into(),
-            );
+            return Err(interpret_ytdlp_error(
+                "yt-dlp failed to fetch video info. Check the URL and try again.",
+                &String::from_utf8_lossy(&output.stderr),
+            ));
         }
 
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)
@@ -171,55 +233,132 @@ pub async fn fetch_formats(
 
         let formats_raw = json["formats"].as_array().cloned().unwrap_or_default();
 
-        let heights: HashSet<u64> = formats_raw
-            .iter()
-            .filter(|f| f["vcodec"].as_str().map(|c| c != "none").unwrap_or(false))
-            .filter_map(|f| f["height"].as_u64())
-            .collect();
+        // ── Build per-stream format rows ───────────────────────────────────────
+        //
+        // Deduplicate video streams by (height, fps, short_codec, dynamic_range),
+        // keeping the highest-bitrate representative for each unique combination.
+        // This mirrors yt-dlp-gui-v2's approach: show individual streams, not
+        // curated quality tiers.
 
-        let quality_tiers: &[(u64, &str)] = &[
-            (2160, "4K Ultra HD"),
-            (1440, "1440p QHD"),
-            (1080, "1080p Full HD"),
-            (720, "720p HD"),
-            (480, "480p"),
-            (360, "360p"),
-        ];
+        let mut best_by_key: HashMap<String, serde_json::Value> = HashMap::new();
 
-        let mut result: Vec<serde_json::Value> = quality_tiers
-            .iter()
-            .filter(|(h, _)| heights.contains(h))
-            .map(|(h, label)| {
-                serde_json::json!({
-                    "formatId": format!("{h}p"),
-                    "label": format!("{label} ({h}p)"),
-                    "ytdlpSelector": format!("bestvideo[height<={h}]+bestaudio/best[height<={h}]"),
-                    "hasVideo": true,
-                    "hasAudio": true,
-                })
-            })
-            .collect();
+        for f in &formats_raw {
+            let vcodec = f["vcodec"].as_str().unwrap_or("none");
+            if vcodec == "none" { continue; }
+            let height = f["height"].as_u64().unwrap_or(0);
+            if height == 0 { continue; }
 
-        result.push(serde_json::json!({
-            "formatId": "audio",
-            "label": "Audio only (best quality)",
-            "ytdlpSelector": "bestaudio",
-            "hasVideo": false,
-            "hasAudio": true,
-        }));
+            let fps = f["fps"].as_f64().map(|v| v.round() as u64).unwrap_or(0);
+            let codec = vcodec.split('.').next().unwrap_or(vcodec);
+            let dr    = f["dynamic_range"].as_str().unwrap_or("SDR");
+            let key   = format!("{height}:{fps}:{codec}:{dr}");
 
-        if result.len() == 1 {
-            result.insert(
-                0,
-                serde_json::json!({
-                    "formatId": "best",
-                    "label": "Best available",
-                    "ytdlpSelector": "bv*+ba/b",
-                    "hasVideo": true,
-                    "hasAudio": true,
-                }),
-            );
+            let tbr_new = f["tbr"].as_f64().unwrap_or(0.0);
+            let tbr_old = best_by_key.get(&key)
+                .and_then(|e| e["tbr"].as_f64())
+                .unwrap_or(-1.0);
+            if tbr_new > tbr_old {
+                best_by_key.insert(key, f.clone());
+            }
         }
+
+        // Sort: height desc, then fps desc
+        let mut deduped: Vec<serde_json::Value> = best_by_key.into_values().collect();
+        deduped.sort_by(|a, b| {
+            let ha = a["height"].as_u64().unwrap_or(0);
+            let hb = b["height"].as_u64().unwrap_or(0);
+            let fa = a["fps"].as_f64().map(|v| v as u64).unwrap_or(0);
+            let fb = b["fps"].as_f64().map(|v| v as u64).unwrap_or(0);
+            hb.cmp(&ha).then(fb.cmp(&fa))
+        });
+
+        let video_rows: Vec<serde_json::Value> = deduped.iter().map(|f| {
+            let height   = f["height"].as_u64().unwrap_or(0);
+            let width    = f["width"].as_u64().unwrap_or(0);
+            let fps_raw  = f["fps"].as_f64().map(|v| v.round() as u64).unwrap_or(0);
+            let vcodec   = f["vcodec"].as_str().unwrap_or("");
+            let codec    = vcodec.split('.').next().unwrap_or(vcodec);
+            let dr       = f["dynamic_range"].as_str().unwrap_or("SDR");
+            let ext      = f["ext"].as_str().unwrap_or("");
+            let fmt_id   = f["format_id"].as_str().unwrap_or("");
+
+            // A format is muxed (contains audio) when acodec is set and not "none".
+            let is_muxed = f["acodec"].as_str().map(|c| c != "none").unwrap_or(false);
+            let selector = if is_muxed {
+                fmt_id.to_string()
+            } else {
+                // Pair video stream with best available audio.
+                // Fallback selector handles sites where format IDs are fragile.
+                format!("{fmt_id}+bestaudio/bestvideo[height<={height}]+bestaudio")
+            };
+
+            let resolution = if width > 0 {
+                format!("{width}\u{00D7}{height}")   // × (U+00D7 multiplication sign)
+            } else {
+                format!("{height}p")
+            };
+            let fps_str = if fps_raw > 0 { fps_raw.to_string() } else { String::new() };
+
+            // Filesize: prefer exact, fall back to approximate with a ~ prefix.
+            let filesize = if let Some(b) = f["filesize"].as_u64() {
+                format_filesize(b)
+            } else if let Some(b) = f["filesize_approx"].as_u64() {
+                format!("~{}", format_filesize(b))
+            } else {
+                String::new()
+            };
+
+            // Compact label used as accessible title / fallback display text.
+            let mut parts = vec![resolution.clone()];
+            if !fps_str.is_empty() { parts.push(format!("{fps_str}fps")); }
+            if !codec.is_empty()   { parts.push(codec.to_string()); }
+            if dr != "SDR" && !dr.is_empty() { parts.push(dr.to_string()); }
+
+            serde_json::json!({
+                "formatId":      fmt_id,
+                "label":         parts.join(" · "),
+                "ytdlpSelector": selector,
+                "hasVideo":      true,
+                "hasAudio":      true,
+                "resolution":    resolution,
+                "fps":           fps_str,
+                "codec":         codec,
+                "filesize":      filesize,
+                "dynamicRange":  dr,
+                "ext":           ext,
+                "sampleRate":    "",
+            })
+        }).collect();
+
+        // Assemble final list: Best available → video streams → Audio only
+        let empty_meta = serde_json::json!({
+            "hasVideo": true, "hasAudio": true,
+            "resolution": "", "fps": "", "codec": "",
+            "filesize": "", "dynamicRange": "", "ext": "", "sampleRate": "",
+        });
+
+        let mut result = vec![{
+            let mut v = empty_meta.clone();
+            v["formatId"]      = "best".into();
+            v["label"]         = "Best available".into();
+            v["ytdlpSelector"] = "bv*+ba/b".into();
+            v
+        }];
+        result.extend(video_rows);
+        result.push(serde_json::json!({
+            "formatId":      "audio",
+            "label":         "Audio only (best quality)",
+            "ytdlpSelector": "bestaudio",
+            "hasVideo":      false,
+            "hasAudio":      true,
+            "resolution":    "",
+            "fps":           "",
+            "codec":         "",
+            "filesize":      "",
+            "dynamicRange":  "",
+            "ext":           "",
+            "sampleRate":    "",
+        }));
 
         Ok(result)
     })
@@ -241,13 +380,13 @@ pub async fn download_video(
     state: State<'_, Mutex<YtdlpState>>,
     app: AppHandle,
 ) -> Result<String, String> {
-    let (ytdlp, temp_dir) = {
+    let (ytdlp, temp_dir, cookie_source) = {
         let guard = state.lock().unwrap_or_else(|e| e.into_inner());
         let p = guard
             .ytdlp_path
             .clone()
             .ok_or("yt-dlp path not set. Click the \u{2699} button to configure it.")?;
-        (p, guard.temp_dir.clone())
+        (p, guard.temp_dir.clone(), guard.cookie_source.clone())
     };
 
     tauri::async_runtime::spawn_blocking(move || {
@@ -267,9 +406,9 @@ pub async fn download_video(
             &output_str,
             "--print",
             "after_move:filepath",
-            "--",   // separates flags from the URL
-            &url,
         ])
+        .args(build_cookie_args(&cookie_source))
+        .args(["--", &url])   // separates flags from the URL
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
         hide_console(&mut cmd);
@@ -281,6 +420,12 @@ pub async fn download_video(
         let stderr = child.stderr.take()
             .ok_or_else(|| "yt-dlp stderr not available (internal error)".to_string())?;
         let app_clone = app.clone();
+
+        // Non-progress lines (warnings, errors) are collected so we can surface
+        // them in the error message if the download fails.
+        let error_lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let error_lines_clone = Arc::clone(&error_lines);
+
         std::thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().filter_map(|l| l.ok()) {
@@ -291,15 +436,21 @@ pub async fn download_video(
                         "ytdlp-progress",
                         serde_json::json!({ "percent": pct, "speed": speed, "eta": eta }),
                     );
+                } else if let Ok(mut v) = error_lines_clone.lock() {
+                    v.push(line);
                 }
             }
         });
 
+        // wait_with_output waits for the process and all IO to close, so the
+        // stderr thread above is guaranteed to finish before we read error_lines.
         let output = child.wait_with_output().map_err(|e| e.to_string())?;
         if !output.status.success() {
-            return Err(
-                "yt-dlp download failed. Check the URL and format, then try again.".into(),
-            );
+            let collected = error_lines.lock().map(|v| v.clone()).unwrap_or_default();
+            return Err(interpret_ytdlp_error(
+                "yt-dlp download failed. Check the URL and format, then try again.",
+                &collected.join("\n"),
+            ));
         }
 
         let final_path = String::from_utf8_lossy(&output.stdout)
@@ -361,6 +512,118 @@ pub fn focus_main_window(app: AppHandle) -> Result<(), String> {
         win.set_focus().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Sends `load-video-file` directly to the main webview and brings it to the
+/// foreground.
+///
+/// Using `win.emit()` from Rust is the reliable cross-window path in Tauri v2.
+/// A frontend `emit()` call only guarantees delivery to the Rust backend; from
+/// there re-delivery to another webview is not synchronously guaranteed.
+/// `win.emit()` bypasses that by targeting the specific webview directly.
+#[tauri::command]
+pub fn load_video_in_main(path: String, app: AppHandle) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("main") {
+        win.emit("load-video-file", &path).map_err(|e| e.to_string())?;
+        win.show().map_err(|e| e.to_string())?;
+        win.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+// ── Cookie / stderr helpers ───────────────────────────────────────────────────
+
+fn build_cookie_args(source: &CookieSource) -> Vec<String> {
+    match source {
+        CookieSource::None => vec![],
+        CookieSource::Browser { browser, profile } => {
+            // yt-dlp accepts `--cookies-from-browser chrome` or `--cookies-from-browser chrome:ProfileName`
+            let arg = if profile.trim().is_empty() {
+                browser.clone()
+            } else {
+                format!("{browser}:{}", profile.trim())
+            };
+            vec!["--cookies-from-browser".into(), arg]
+        }
+        CookieSource::File { path } => vec!["--cookies".into(), path.clone()],
+    }
+}
+
+/// Human-readable file size string.
+fn format_filesize(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.1} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.0} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1_024 {
+        format!("{:.0} KB", bytes as f64 / 1_024.0)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+/// Inspect yt-dlp stderr for known failure patterns and build an error string
+/// with an actionable hint followed by the raw yt-dlp output.
+///
+/// Pattern matching uses lowercase so it catches any capitalisation variant.
+fn interpret_ytdlp_error(default_msg: &str, stderr_text: &str) -> String {
+    let lower = stderr_text.to_lowercase();
+
+    let hint: Option<&str> = if lower.contains("javascript runtime")
+        || lower.contains("challenge solver")
+        || lower.contains("po_token")
+        || lower.contains("potoken")
+    {
+        Some(
+            "Hint: YouTube requires a JavaScript challenge solver. \
+             Set Cookie source → Browser to pass your logged-in browser session to yt-dlp, \
+             or install Node.js so yt-dlp can solve the challenge itself.",
+        )
+    } else if lower.contains("sign in to confirm")
+        || lower.contains("sign in to access")
+        || lower.contains("age-restricted")
+        || lower.contains("age restricted")
+        || lower.contains("members-only")
+        || lower.contains("member-only")
+    {
+        Some(
+            "Hint: This video requires authentication (age restriction or members-only). \
+             Set Cookie source → Browser so yt-dlp can use your logged-in session.",
+        )
+    } else if lower.contains("private video") {
+        Some("Hint: This video is private and cannot be downloaded.")
+    } else if lower.contains("video unavailable") {
+        Some(
+            "Hint: This video is unavailable (deleted, region-blocked, or taken down).",
+        )
+    } else if lower.contains("only images are available") {
+        Some(
+            "Hint: No video formats found — yt-dlp only sees images at this URL. \
+             The URL may point to a photo post, or the video requires cookies to access. \
+             Try setting Cookie source → Browser.",
+        )
+    } else if lower.contains("requested format is not available") {
+        Some(
+            "Hint: The selected quality is not available for this video. \
+             Try fetching formats again — the list may contain different options.",
+        )
+    } else {
+        None
+    };
+
+    // Always append the raw yt-dlp output (truncated) so users can see what went wrong.
+    let trimmed = stderr_text.trim();
+    let raw = if trimmed.is_empty() {
+        String::new()
+    } else {
+        let snippet = if trimmed.len() > 400 { &trimmed[trimmed.len() - 400..] } else { trimmed };
+        format!("\n\nyt-dlp output:\n{snippet}")
+    };
+
+    match hint {
+        Some(h) => format!("{default_msg}\n\n{h}{raw}"),
+        None    => format!("{default_msg}{raw}"),
+    }
 }
 
 // ── Progress parsing helpers ──────────────────────────────────────────────────
@@ -440,5 +703,80 @@ mod tests {
             parse_download_speed(line).as_deref(),
             Some("3.00MiB/s")
         );
+    }
+
+    #[test]
+    fn cookie_args_none() {
+        assert!(build_cookie_args(&CookieSource::None).is_empty());
+    }
+
+    #[test]
+    fn cookie_args_browser_no_profile() {
+        assert_eq!(
+            build_cookie_args(&CookieSource::Browser { browser: "chrome".into(), profile: String::new() }),
+            ["--cookies-from-browser", "chrome"]
+        );
+    }
+
+    #[test]
+    fn cookie_args_browser_with_profile() {
+        assert_eq!(
+            build_cookie_args(&CookieSource::Browser { browser: "chrome".into(), profile: "Default".into() }),
+            ["--cookies-from-browser", "chrome:Default"]
+        );
+    }
+
+    #[test]
+    fn cookie_args_file() {
+        assert_eq!(
+            build_cookie_args(&CookieSource::File { path: "/cookies.txt".into() }),
+            ["--cookies", "/cookies.txt"]
+        );
+    }
+
+    #[test]
+    fn format_filesize_mb() {
+        assert_eq!(format_filesize(150 * 1_048_576), "150 MB");
+    }
+
+    #[test]
+    fn format_filesize_gb() {
+        assert!(format_filesize(2 * 1_073_741_824).contains("GB"));
+    }
+
+    #[test]
+    fn interpret_js_challenge_hint() {
+        let err = interpret_ytdlp_error("Fetch failed.", "You need to have a supported JavaScript runtime and challenge solver");
+        assert!(err.contains("Hint:"));
+        assert!(err.contains("Cookie source"));
+        assert!(err.contains("Node.js"));
+    }
+
+    #[test]
+    fn interpret_age_restricted_hint() {
+        let err = interpret_ytdlp_error("Fetch failed.", "ERROR: Sign in to confirm your age");
+        assert!(err.contains("Hint:"));
+        assert!(err.contains("Cookie source"));
+    }
+
+    #[test]
+    fn interpret_only_images_hint() {
+        let err = interpret_ytdlp_error("Fetch failed.", "WARNING: Only images are available for download");
+        assert!(err.contains("Hint:"));
+        assert!(err.contains("Cookie source"));
+    }
+
+    #[test]
+    fn interpret_unknown_shows_raw() {
+        let err = interpret_ytdlp_error("Fetch failed.", "some unexpected error XYZ");
+        assert!(!err.contains("Hint:"));
+        assert!(err.contains("yt-dlp output:"));
+        assert!(err.contains("some unexpected error XYZ"));
+    }
+
+    #[test]
+    fn interpret_empty_stderr_no_snippet() {
+        let err = interpret_ytdlp_error("Fetch failed.", "");
+        assert_eq!(err, "Fetch failed.");
     }
 }
