@@ -219,7 +219,9 @@ export function ExportModal({
   // Output extension follows the chosen container; "same as source" keeps the
   // input file's extension.
   const inputStem = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') ?? 'video'
-  const inputExt  = '.' + (filePath.split('.').pop() ?? 'mp4')
+  const lastDot = filePath.lastIndexOf('.')
+  const lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
+  const inputExt = lastDot > lastSep ? filePath.slice(lastDot) : '.mp4'
   const outExt    = CONTAINER_EXT[s.container] ?? inputExt
   const previewName = expandFilename(s.filenamePattern || '{original}_{n}', inputStem, 1, outExt)
 
