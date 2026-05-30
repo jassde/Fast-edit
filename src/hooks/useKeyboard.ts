@@ -85,18 +85,21 @@ export function useKeyboard(
           break
 
         case 'setStart':
+          e.preventDefault()
           if (s.selectedSegmentId) {
             a.setSelectedStart(s.playheadPosition)
           }
           break
 
         case 'setEnd':
+          e.preventDefault()
           if (s.selectedSegmentId) {
             a.setSelectedEnd(s.playheadPosition)
           }
           break
 
         case 'deleteSegment':
+          e.preventDefault()
           if (s.selectedSegmentId) {
             a.deleteSegment(s.selectedSegmentId)
           }
