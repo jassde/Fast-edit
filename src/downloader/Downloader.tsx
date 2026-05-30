@@ -29,8 +29,18 @@ export default function Downloader() {
   }, [])
 
   useEffect(() => {
-    const unlisten = listen<YtdlpProgress>('ytdlp-progress', e => setProgress(e.payload))
-    return () => { unlisten.then(fn => fn()) }
+    let aborted = false
+    let unlisten: (() => void) | null = null
+    listen<YtdlpProgress>('ytdlp-progress', e => setProgress(e.payload))
+      .then(ul => {
+        if (aborted) ul()
+        else unlisten = ul
+      })
+      .catch(console.error)
+    return () => {
+      aborted = true
+      unlisten?.()
+    }
   }, [])
 
   const handleFetch = useCallback(async () => {
