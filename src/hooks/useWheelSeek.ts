@@ -29,14 +29,17 @@ export function useWheelSeek(
   state: AppState,
   actions: AppActions,
   playback: PlaybackCommands,
+  shortcutsModalOpen: boolean,
 ) {
-  const stateRef    = useRef(state)
-  const actionsRef  = useRef(actions)
-  const playbackRef = useRef(playback)
+  const stateRef              = useRef(state)
+  const actionsRef            = useRef(actions)
+  const playbackRef           = useRef(playback)
+  const shortcutsModalOpenRef = useRef(shortcutsModalOpen)
 
-  stateRef.current    = state
-  actionsRef.current  = actions
-  playbackRef.current = playback
+  stateRef.current              = state
+  actionsRef.current            = actions
+  playbackRef.current           = playback
+  shortcutsModalOpenRef.current = shortcutsModalOpen
 
   useEffect(() => {
     function handleWheel(e: WheelEvent) {
@@ -45,7 +48,7 @@ export function useWheelSeek(
       const p = playbackRef.current
 
       if (s.duration === 0) return
-      if (s.showExportModal || s.showSettingsModal) return
+      if (s.showExportModal || s.showSettingsModal || shortcutsModalOpenRef.current) return
 
       const target = e.target as HTMLElement
       if (

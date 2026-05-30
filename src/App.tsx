@@ -57,7 +57,7 @@ export default function App() {
   useKeyboard(state, actions, playback, shortcuts.keyToAction, showShortcutsModal)
 
   // Global scroll-wheel seeking (works anywhere in the window, not just the timeline)
-  useWheelSeek(state, actions, playback)
+  useWheelSeek(state, actions, playback, showShortcutsModal)
 
   // Native file picker (Open File button)
   const handleOpenFile = useCallback(async () => {
