@@ -278,7 +278,8 @@ pub async fn download_video(
             .spawn()
             .map_err(|e| format!("Failed to start yt-dlp: {e}"))?;
 
-        let stderr = child.stderr.take().unwrap();
+        let stderr = child.stderr.take()
+            .ok_or_else(|| "yt-dlp stderr not available (internal error)".to_string())?;
         let app_clone = app.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stderr);

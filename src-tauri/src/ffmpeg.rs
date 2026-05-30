@@ -486,7 +486,8 @@ fn run_ffmpeg_with_progress(
     // BufReader::lines() splits on `\n` only, so it would never see mid-segment
     // updates and the progress bar would jump 0 → 100 per segment. Read raw
     // bytes and split on either terminator instead.
-    let stderr = child.stderr.take().unwrap();
+    let stderr = child.stderr.take()
+        .ok_or_else(|| "ffmpeg stderr not available (internal error)".to_string())?;
     let mut reader = BufReader::new(stderr);
     let mut line_buf: Vec<u8> = Vec::with_capacity(256);
 
