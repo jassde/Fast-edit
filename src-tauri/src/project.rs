@@ -27,6 +27,16 @@ pub struct Project {
 
 const SUPPORTED_VERSION: u32 = 1;
 
+fn validate_version(proj: &Project) -> Result<(), String> {
+    if proj.version != SUPPORTED_VERSION {
+        return Err(format!(
+            "Unsupported project version {} (expected {})",
+            proj.version, SUPPORTED_VERSION
+        ));
+    }
+    Ok(())
+}
+
 fn resolve_default_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let docs = app.path().document_dir().map_err(|e| e.to_string())?;
     Ok(docs.join("Video Trimmer").join("saves"))
@@ -53,12 +63,7 @@ pub fn save_project(path: String, project: Project) -> Result<(), String> {
 pub fn load_project(path: String) -> Result<Project, String> {
     let txt = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let proj: Project = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
-    if proj.version != SUPPORTED_VERSION {
-        return Err(format!(
-            "Unsupported project version {} (expected {})",
-            proj.version, SUPPORTED_VERSION
-        ));
-    }
+    validate_version(&proj)?;
     Ok(proj)
 }
 
@@ -96,8 +101,22 @@ mod tests {
 
     #[test]
     fn rejects_unknown_version_via_load_logic() {
-        let bad = r#"{"version":99,"savedAt":"x","filePath":"y","duration":0,"playheadPosition":0,"segments":[]}"#;
-        let proj: Project = serde_json::from_str(bad).unwrap();
-        assert_ne!(proj.version, SUPPORTED_VERSION);
+        let bad = Project {
+            version: 99,
+            saved_at: "x".into(),
+            file_path: "y".into(),
+            duration: 0.0,
+            playhead_position: 0.0,
+            segments: vec![],
+        };
+        let result = validate_version(&bad);
+        assert!(result.is_err(), "expected version 99 to be rejected");
+        let msg = result.unwrap_err();
+        assert!(msg.contains("99"), "error should mention the bad version, got: {msg}");
+        assert!(msg.contains(&SUPPORTED_VERSION.to_string()), "error should mention expected version");
+
+        // Also verify that the supported version passes.
+        let good = Project { version: SUPPORTED_VERSION, ..bad };
+        assert!(validate_version(&good).is_ok());
     }
 }
