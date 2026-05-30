@@ -286,7 +286,8 @@ fn software_args(codec: &Codec, crf: u32) -> Vec<String> {
         args.extend(["-b:v".into(), "0".into()]);
     }
     // crf 0 = lossless; veryslow squeezes out the best compression.
-    if crf == 0 {
+    // Note: -preset is only valid for libx264/libx265, not libvpx-vp9.
+    if crf == 0 && !matches!(codec, Codec::Vp9) {
         args.extend(["-preset".into(), "veryslow".into()]);
     }
     args
@@ -1069,6 +1070,13 @@ mod tests {
         assert!(args.contains(&"libx264".to_string()));
         assert!(args.contains(&"0".to_string()));
         assert!(args.contains(&"-preset".to_string()) && args.contains(&"veryslow".to_string()));
+    }
+
+    #[test]
+    fn software_args_vp9_crf_zero_has_no_preset() {
+        let args = software_args(&Codec::Vp9, 0);
+        assert!(!args.contains(&"-preset".to_string()),
+            "libvpx-vp9 does not accept -preset; got: {:?}", args);
     }
 
     #[test]
