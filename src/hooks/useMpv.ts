@@ -58,6 +58,29 @@ export function useMpv(
   const actionsRef = useRef(actions)
   actionsRef.current = actions
 
+  // ── Pending-seek guard ────────────────────────────────────────────────
+  // When we issue a `seek`, mpv may take a while to process it — especially
+  // for backward seeks on long videos with sparse keyframes, where mpv has to
+  // seek to the prior keyframe (potentially many seconds earlier) and decode
+  // forward to the exact target under `hr-seek=yes`. During that window the
+  // plugin can emit intermediate `time-pos` values (pre-seek position, or
+  // keyframe-decode progress), which would clobber our caller's optimistic
+  // playhead update with stale data.
+  //
+  // Strategy: track the requested seek target. For every time-pos report:
+  //   - within `SEEK_CONVERGE_TOL` of target → mpv arrived, clear the guard
+  //   - past hard cap `SEEK_GUARD_MAX_MS` → assume stuck, clear and accept
+  //     (so the UI never freezes on a phantom position from a truly failed seek)
+  //   - otherwise → stale report; drop it AND extend the soft deadline so the
+  //     guard stays armed as long as mpv is making progress (or emitting
+  //     anything at all). The soft deadline also catches silence — if mpv stops
+  //     emitting for `SEEK_GUARD_EXTEND_MS`, we accept the next event whatever
+  //     it is.
+  const pendingSeekRef = useRef<{ target: number; armedAt: number; until: number } | null>(null)
+  const SEEK_GUARD_EXTEND_MS = 800   // bump deadline this far on each stale report
+  const SEEK_GUARD_MAX_MS    = 8000  // absolute cap — handles multi-second hr-seeks on 1hr+ files
+  const SEEK_CONVERGE_TOL    = 0.05  // seconds; "we got there" threshold
+
   // ── Init mpv once, observe properties ─────────────────────────────────
   // The plugin's init() is idempotent — calling it for a window that already
   // has an instance is a no-op success. So in StrictMode dev the second mount
@@ -76,9 +99,33 @@ export function useMpv(
         const ul = await observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
           const a = actionsRef.current
           switch (name) {
-            case 'time-pos':
-              a.setPlayheadPosition(data ?? 0)
+            case 'time-pos': {
+              const pos = data ?? 0
+              const pending = pendingSeekRef.current
+              if (pending) {
+                const now = Date.now()
+                if (Math.abs(pos - pending.target) <= SEEK_CONVERGE_TOL) {
+                  // mpv arrived at the target — accept and disarm.
+                  pendingSeekRef.current = null
+                } else if (now - pending.armedAt > SEEK_GUARD_MAX_MS) {
+                  // Hard cap — assume the seek stalled or was preempted.
+                  // Accept whatever mpv last reported so the UI doesn't freeze.
+                  pendingSeekRef.current = null
+                } else if (now > pending.until) {
+                  // Soft deadline expired with no progress signal. Accept this
+                  // report (a non-converged but recent update is better than
+                  // refusing forever).
+                  pendingSeekRef.current = null
+                } else {
+                  // Still pending — extend the soft deadline so we keep waiting
+                  // as long as mpv is emitting (even if not yet converged).
+                  pending.until = now + SEEK_GUARD_EXTEND_MS
+                  break  // drop this stale report
+                }
+              }
+              a.setPlayheadPosition(pos)
               break
+            }
             case 'duration':
               if (data && data > 0) a.setDuration(data)
               break
@@ -170,7 +217,18 @@ export function useMpv(
   // ── Playback command helpers (stable identities) ─────────────────────
   const play          = useCallback(() => { setProperty('pause', false).catch(console.error) }, [])
   const pause         = useCallback(() => { setProperty('pause', true ).catch(console.error) }, [])
-  const seek          = useCallback((pos: number) => { command('seek', [pos, 'absolute']).catch(console.error) }, [])
+  const seek          = useCallback((pos: number) => {
+    // Arm the pending-seek guard BEFORE dispatching the command so any
+    // in-flight stale time-pos events arriving between now and seek completion
+    // are filtered out (see pendingSeekRef comment above).
+    const now = Date.now()
+    pendingSeekRef.current = {
+      target:  pos,
+      armedAt: now,
+      until:   now + SEEK_GUARD_EXTEND_MS,
+    }
+    command('seek', [pos, 'absolute']).catch(console.error)
+  }, [])
   const frameStep     = useCallback(() => { command('frame-step').catch(console.error) }, [])
   const frameBackStep = useCallback(() => { command('frame-back-step').catch(console.error) }, [])
   const setMute       = useCallback((muted: boolean) => { setProperty('mute', muted).catch(console.error) }, [])

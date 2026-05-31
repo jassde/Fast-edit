@@ -171,22 +171,33 @@ pub fn save_cookie_settings(
 
 /// Validates the given path (creates it if needed), persists it as the temp
 /// directory, and updates running state so the next download uses it.
+///
+/// Validation: trims whitespace, rejects empty input, requires an absolute path
+/// (relative paths would resolve against the app's CWD, which is surprising and
+/// not portable across launches). Canonicalises after `create_dir_all` so the
+/// persisted value is the resolved absolute form.
 #[tauri::command]
 pub fn save_temp_dir(
     path: String,
     state: State<'_, Mutex<YtdlpState>>,
     app: AppHandle,
-) -> Result<(), String> {
-    let new_path = PathBuf::from(&path);
+) -> Result<String, String> {
+    let new_path = validate_temp_dir_path(&path)?;
+
     fs::create_dir_all(&new_path).map_err(|e| format!("Cannot create directory: {e}"))?;
 
+    // Canonicalise so the persisted value is the resolved absolute form (drops
+    // trailing slashes, resolves `..`, normalises separators).
+    let canonical = new_path.canonicalize().unwrap_or(new_path);
+    let canonical_str = canonical.to_string_lossy().to_string();
+
     let mut cfg = load_config(&app);
-    cfg.temp_dir = Some(path);
+    cfg.temp_dir = Some(canonical_str.clone());
     save_config(&app, &cfg)?;
 
     let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
-    guard.temp_dir = new_path;
-    Ok(())
+    guard.temp_dir = canonical;
+    Ok(canonical_str)
 }
 
 /// Runs `yt-dlp -j <url>` and returns a curated list of quality tiers.
@@ -504,31 +515,22 @@ pub fn clear_temp_dir(state: State<'_, Mutex<YtdlpState>>) -> Result<(), String>
     Ok(())
 }
 
-/// Focuses and un-minimises the main window (called after "Load into Editor").
-#[tauri::command]
-pub fn focus_main_window(app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window("main") {
-        win.show().map_err(|e| e.to_string())?;
-        win.set_focus().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
+// ── Temp dir validation ───────────────────────────────────────────────────────
 
-/// Sends `load-video-file` directly to the main webview and brings it to the
-/// foreground.
-///
-/// Using `win.emit()` from Rust is the reliable cross-window path in Tauri v2.
-/// A frontend `emit()` call only guarantees delivery to the Rust backend; from
-/// there re-delivery to another webview is not synchronously guaranteed.
-/// `win.emit()` bypasses that by targeting the specific webview directly.
-#[tauri::command]
-pub fn load_video_in_main(path: String, app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window("main") {
-        win.emit("load-video-file", &path).map_err(|e| e.to_string())?;
-        win.show().map_err(|e| e.to_string())?;
-        win.set_focus().map_err(|e| e.to_string())?;
+/// Trim, reject empty, and require an absolute path. Returned PathBuf is the
+/// pre-canonicalisation form (caller `create_dir_all`s, then canonicalises).
+fn validate_temp_dir_path(input: &str) -> Result<PathBuf, String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Err("Temp folder path cannot be empty.".to_string());
     }
-    Ok(())
+    let p = PathBuf::from(trimmed);
+    if !p.is_absolute() {
+        return Err(format!(
+            "Temp folder must be an absolute path (got: {trimmed})."
+        ));
+    }
+    Ok(p)
 }
 
 // ── Cookie / stderr helpers ───────────────────────────────────────────────────
@@ -778,5 +780,45 @@ mod tests {
     fn interpret_empty_stderr_no_snippet() {
         let err = interpret_ytdlp_error("Fetch failed.", "");
         assert_eq!(err, "Fetch failed.");
+    }
+
+    #[test]
+    fn validate_temp_dir_rejects_empty() {
+        assert!(validate_temp_dir_path("").is_err());
+        assert!(validate_temp_dir_path("   ").is_err());
+        assert!(validate_temp_dir_path("\t\n").is_err());
+    }
+
+    #[test]
+    fn validate_temp_dir_rejects_relative() {
+        assert!(validate_temp_dir_path("Temp").is_err());
+        assert!(validate_temp_dir_path("./Temp").is_err());
+        assert!(validate_temp_dir_path("../Temp").is_err());
+    }
+
+    #[test]
+    fn validate_temp_dir_accepts_absolute() {
+        // Use platform-appropriate absolute path — Windows demands a drive letter,
+        // Unix-likes treat any leading `/` as absolute.
+        #[cfg(windows)]
+        let p = "C:\\Users\\test\\Temp";
+        #[cfg(not(windows))]
+        let p = "/tmp/test";
+
+        let result = validate_temp_dir_path(p).unwrap();
+        assert!(result.is_absolute());
+    }
+
+    #[test]
+    fn validate_temp_dir_trims_whitespace() {
+        #[cfg(windows)]
+        let p = "  C:\\Users\\test\\Temp  ";
+        #[cfg(not(windows))]
+        let p = "  /tmp/test  ";
+
+        let result = validate_temp_dir_path(p).unwrap();
+        // After trimming, the path is parsed cleanly with no leading/trailing spaces.
+        assert!(!result.to_string_lossy().starts_with(' '));
+        assert!(!result.to_string_lossy().ends_with(' '));
     }
 }

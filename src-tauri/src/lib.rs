@@ -46,8 +46,6 @@ pub fn run() {
             ytdlp::download_video,
             ytdlp::get_temp_dir,
             ytdlp::clear_temp_dir,
-            ytdlp::focus_main_window,
-            ytdlp::load_video_in_main,
             project::default_save_dir,
             project::save_project,
             project::load_project,

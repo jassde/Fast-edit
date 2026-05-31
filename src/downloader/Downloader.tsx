@@ -88,6 +88,7 @@ export default function Downloader() {
     try {
       await invoke('save_cookie_settings', { cookieSource: source })
       setCookieSource(source)
+      setErrorMsg('')
     } catch (e) {
       setErrorMsg(String(e))
     } finally {
@@ -104,7 +105,12 @@ export default function Downloader() {
 
   const handleOpenTempFolder = useCallback(async () => {
     if (!tempDir) return
-    await openPath(tempDir)
+    try {
+      await openPath(tempDir)
+      setErrorMsg('')
+    } catch (e) {
+      setErrorMsg(`Could not open folder: ${e}`)
+    }
   }, [tempDir])
 
   const handleBrowseTempDir = useCallback(async () => {
@@ -115,8 +121,10 @@ export default function Downloader() {
   const handleSaveTempDir = useCallback(async () => {
     setSavingTempPath(true)
     try {
-      await invoke('save_temp_dir', { path: tempDirInput })
-      setTempDir(tempDirInput)
+      const canonical = await invoke<string>('save_temp_dir', { path: tempDirInput })
+      setTempDir(canonical)
+      setTempDirInput(canonical)
+      setErrorMsg('')
     } catch (e) {
       setErrorMsg(String(e))
     } finally {
@@ -363,8 +371,9 @@ export default function Downloader() {
           </div>
         )}
 
-        {/* Error message */}
-        {phase === 'error' && (
+        {/* Error message — shown whenever set, not gated on phase, so settings
+            save failures (temp dir, cookies) surface to the user too. */}
+        {errorMsg && (
           <div className="modal-error">{errorMsg}</div>
         )}
 

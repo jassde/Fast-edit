@@ -134,24 +134,6 @@ export default function App() {
     actions.setPlayheadPosition(pos)
   }, [state.duration, playback, actions])
 
-  // Cross-window: load a video file emitted by the downloader window.
-  // Uses the aborted-flag pattern (mirrors useMpv) to handle the StrictMode
-  // double-mount race where the component unmounts before listen() resolves.
-  useEffect(() => {
-    let aborted = false
-    let unlisten: (() => void) | null = null
-    listen<string>('load-video-file', (event) => {
-      actions.setFilePath(event.payload)
-    }).then(ul => {
-      if (aborted) ul()
-      else unlisten = ul
-    })
-    return () => {
-      aborted = true
-      unlisten?.()
-    }
-  }, [actions])
-
   // ── Scroll-panel window ────────────────────────────────────────────────
   // A decoration-free WebviewWindow shows the two scroll-step sliders. The
   // panel takes focus normally (no refocus hack) — keyboard shortcuts only

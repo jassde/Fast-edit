@@ -59,12 +59,26 @@ export function useWheelSeek(
         return
       }
 
+      // Direction detection. Some Windows touchpad / mouse drivers (and a few
+      // WebView2 builds) report `e.deltaY` with the SAME sign for both physical
+      // scroll directions, breaking direction inference. The legacy
+      // `wheelDeltaY` property carries the original WHEEL_DELTA from the OS
+      // event (+120 per notch up, -120 per notch down) and is still exposed by
+      // Chromium, so prefer it when available. Note its sign convention is the
+      // OPPOSITE of `deltaY`: wheelDeltaY > 0 = scroll up = seek backward.
+      // Fall back to `deltaY` if `wheelDeltaY` is missing (non-Chromium engines)
+      // or zero (smooth-scroll devices that emit deltaY=0 mid-gesture).
+      const wd = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY
+      const sign = wd !== undefined && wd !== 0
+        ? -Math.sign(wd)
+        : Math.sign(e.deltaY)
+      if (sign === 0) return  // genuine no-direction event — ignore
+
       e.preventDefault()
-      const direction = e.deltaY > 0 ? 1 : -1
-      const stepSec   = e.shiftKey
-        ? direction * s.secondsPerShiftScrollTick
-        : direction * s.framesPerScrollTick * (1 / (s.fps || DEFAULT_FPS))
-      const newPos    = clamp(s.playheadPosition + stepSec, 0, s.duration)
+      const stepSec = e.shiftKey
+        ? sign * s.secondsPerShiftScrollTick
+        : sign * s.framesPerScrollTick * (1 / (s.fps || DEFAULT_FPS))
+      const newPos  = clamp(s.playheadPosition + stepSec, 0, s.duration)
 
       p.seek(newPos)
       a.setPlayheadPosition(newPos)
