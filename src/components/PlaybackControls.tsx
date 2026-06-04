@@ -1,8 +1,10 @@
 import { MIN_TIMELINE_ZOOM, MAX_TIMELINE_ZOOM } from '../constants'
+import { formatTime } from '../utils'
 
 type PlaybackControlsProps = {
   // transport
   duration: number
+  playheadPosition: number
   isPlaying: boolean
   isMuted: boolean
   onPlay: () => void
@@ -84,6 +86,7 @@ const IconTrash = () => (
 
 export function PlaybackControls({
   duration,
+  playheadPosition,
   isPlaying,
   isMuted,
   onPlay,
@@ -230,6 +233,17 @@ export function PlaybackControls({
           aria-label="Timeline zoom"
           title="Zoom: magnify the visible portion of the timeline (centered on the playhead)"
         />
+
+        {hasFile && (
+          <>
+            <div className="pc-sep" />
+            <span className="pc-timecode" title="Current position / total duration">
+              <span>{formatTime(playheadPosition)}</span>
+              <span className="pc-timecode-sep">/</span>
+              <span className="pc-timecode-total">{formatTime(duration)}</span>
+            </span>
+          </>
+        )}
       </div>
 
     </div>
