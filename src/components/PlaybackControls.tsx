@@ -1,3 +1,5 @@
+import { MIN_TIMELINE_ZOOM, MAX_TIMELINE_ZOOM } from '../constants'
+
 type PlaybackControlsProps = {
   // transport
   duration: number
@@ -219,8 +221,8 @@ export function PlaybackControls({
         <input
           type="range"
           className="timeline-zoom-slider"
-          min={1}
-          max={50}
+          min={MIN_TIMELINE_ZOOM}
+          max={MAX_TIMELINE_ZOOM}
           step={0.5}
           value={zoom}
           onChange={e => onChangeZoom(Number(e.target.value))}

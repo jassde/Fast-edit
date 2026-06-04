@@ -1,6 +1,6 @@
 import './App.css'
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
-import { formatTime } from './utils'
+import { formatTime, defaultZoomForDuration } from './utils'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
@@ -285,7 +285,20 @@ export default function App() {
   // Timeline zoom — local UI state, not persisted across sessions. 1 = fit
   // entire video; higher values show a window of `duration / zoom` seconds
   // centered on the playhead.
+  //
+  // On every new file load (once mpv has reported the duration), reset to
+  // `defaultZoomForDuration` so longer videos open with a useful editing
+  // window instead of a single squashed strip. Manual slider changes after
+  // load aren't overridden — the ref guards against re-firing for the same
+  // file when mpv re-reports duration mid-playback.
   const [timelineZoom, setTimelineZoom] = useState<number>(1)
+  const lastZoomedFileRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!state.filePath || state.duration === 0) return
+    if (lastZoomedFileRef.current === state.filePath) return
+    lastZoomedFileRef.current = state.filePath
+    setTimelineZoom(defaultZoomForDuration(state.duration))
+  }, [state.filePath, state.duration])
 
   // Single sorted copy shared by the segment indicator and handleSelectNext.
   const sortedSegments = useMemo(

@@ -1,4 +1,9 @@
-import { SEGMENT_COLORS } from './constants'
+import {
+  SEGMENT_COLORS,
+  MIN_TIMELINE_ZOOM,
+  MAX_TIMELINE_ZOOM,
+  DEFAULT_TARGET_VISIBLE_SECONDS,
+} from './constants'
 
 /** Format seconds to HH:MM:SS.mmm */
 export function formatTime(seconds: number): string {
@@ -18,6 +23,19 @@ export function formatTime(seconds: number): string {
 /** Clamp value between min and max */
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
+}
+
+/**
+ * Default timeline zoom for a freshly-loaded video. Targets a visible window
+ * of `DEFAULT_TARGET_VISIBLE_SECONDS` seconds, clamped to slider bounds. So a
+ * 10s clip stays at 1x (full view), a 10min file opens at 10x, and a 2hr file
+ * opens at 120x. Returns 1 (no zoom) if duration isn't known yet.
+ */
+export function defaultZoomForDuration(duration: number): number {
+  if (!isFinite(duration) || duration <= DEFAULT_TARGET_VISIBLE_SECONDS) {
+    return MIN_TIMELINE_ZOOM
+  }
+  return clamp(duration / DEFAULT_TARGET_VISIBLE_SECONDS, MIN_TIMELINE_ZOOM, MAX_TIMELINE_ZOOM)
 }
 
 /** Convert pixel offset on timeline to time in seconds */
