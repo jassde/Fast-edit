@@ -49,7 +49,7 @@ There is no Rust mpv code in this repo. The plugin owns the mpv lifecycle, prope
 ### Frontend (`src/`)
 
 - `main.tsx` — entry point. Reads `window.location.hash` at startup; renders `<Downloader />` when hash is `#downloader`, otherwise renders `<App />`. Also adds a `downloader-window` class to `<html>` in the downloader case — used to scope CSS that must not leak into the main window (see Gotchas).
-- `App.tsx` — root component; lays out the chrome and a `#video-panel` div (the slot mpv renders behind). Manages segment state via `useAppState`.
+- `App.tsx` — root component; lays out the **left icon sidebar** + a `#video-panel` div (the slot mpv renders behind). Owns project save/load, hosts the rebindable-shortcut hook, opens the Downloader and ScrollPanelApp side windows.
 - `constants.ts` / `types.ts` / `utils.ts` — single source of truth for constants (timeline dims, scroll-step bounds, color palette), shared types (`Segment`, `Codec`, `Container`, `HwEncoder`, `HwSupport`, `VideoFormat`, `YtdlpProgress`, `YtdlpConfig`), and helpers (`clamp`, `newId`, `pickColor`, `expandFilename`, `formatTime`).
 - `hooks/useMpv.ts` — owns the libmpv plugin lifecycle:
   - `init()` once on mount with `vo: gpu-next`, `hwdec: auto-safe`, `keep-open: yes`, `force-window: yes`, `pause: yes`, `hr-seek: yes`. Idempotent — never calls `destroy()` (the plugin tears down on `WindowEvent::CloseRequested`).
@@ -58,20 +58,22 @@ There is no Rust mpv code in this repo. The plugin owns the mpv lifecycle, prope
   - Calls `command('loadfile', [path])` when `filePath` changes.
   - Returns `{ play, pause, seek, frameStep, frameBackStep, setMute }`.
 - `hooks/useAppState.ts` — single state hook holding segments, playhead, duration, fps, mute, file path, modal/error state, and persisted user settings (scroll-step values, HW encoder, scroll panel visibility). Persists settings to localStorage under `video-trimmer-settings`.
-- `hooks/useKeyboard.ts` — global keydown handler (Space, ←/→, I, O, Delete); reads state via refs to avoid re-registering on every render.
+- `hooks/useKeyboard.ts` — global keydown handler; reads state via refs to avoid re-registering on every render. Maps keys → actions via the table returned by `useShortcuts` (not hard-coded).
+- `hooks/useShortcuts.ts` — user-rebindable shortcut bindings for `playPause | frameBack | frameForward | setStart | setEnd | deleteSegment`. Defaults: Space, ←, →, I, O, Delete. Persisted to localStorage under **`video-trimmer-shortcuts`** (separate key from the main settings blob).
 - `hooks/useWheelSeek.ts` — **global** window-level wheel listener (non-passive). Wheel = step `framesPerScrollTick` frames using clip's real fps; Shift+wheel = step `secondsPerShiftScrollTick` seconds. Suppressed when modals are open or focus is on form controls. Mirrors `useKeyboard`'s ref-based pattern.
 - `hooks/useFileDrop.ts` — Tauri webview drag-drop, filtered by extension.
 - `components/PlaybackControls.tsx` — unified control bar: transport (play/pause/frame-step/mute), segment edit (set start/end, add/delete, Next ▸), and zoom slider.
 - `components/Timeline.tsx` — ruler, segments, playhead, drag handles. Wheel listener attached natively (non-passive) so `preventDefault` works.
 - `components/ExportModal.tsx` — output dir picker, mode/codec/container/quality form, progress UI driven by the `export-progress` Tauri event. Codec choices filtered by container; HW encoder label reflects current `hwEncoder` setting (CRF 0 always forces software).
-- `components/SettingsModal.tsx` — scroll-step sliders, HW encoder dropdown (gated by probed `HwSupport`), and toggle for the floating scroll panel.
-- `components/ScrollSettingsPanel.tsx` — draggable floating panel mirroring the two scroll-step sliders from the Settings modal so they can be tuned while editing. Visibility persisted.
+- `components/SettingsModal.tsx` — scroll-step sliders, HW encoder dropdown (gated by probed `HwSupport`), toggle for the scroll panel window, and yt-dlp cookie-source picker (none / browser / file).
+- `components/ShortcutsModal.tsx` — rebind UI for the actions in `useShortcuts`. Refuses to bind Escape/Tab/Shift/Control/Alt/Meta.
+- `components/ScrollPanelApp.tsx` — **separate Tauri window** rendered when the URL hash is `#scroll-panel` (see `main.tsx` routing). Mirrors the two scroll-step sliders so they can be tuned while editing. Communicates with the main window via Tauri `emit`/`listen` events, not in-process state.
 - File drop is handled via Tauri's `onDragDropEvent`.
 - No CSS framework — custom dark theme. The body and `.video-panel` are `background: transparent`; every chrome region (top bar, controls, timeline, modal) sets its own opaque background.
 
 ### Downloader (`src/downloader/`)
 
-A second Tauri window (`label: "downloader"`) opened from the main top bar via `WebviewWindow`. Uses the same JS bundle via hash routing (see `main.tsx` above).
+A second Tauri window (`label: "downloader"`) opened from the main **left sidebar** via `WebviewWindow`. Uses the same JS bundle via hash routing (see `main.tsx` above). The ScrollPanelApp window (`#scroll-panel` hash) follows the same pattern.
 
 - `Downloader.tsx` — full downloader UI: URL input, yt-dlp format list, download progress, "Load into Editor" (emits `load-video-file` event to main window), "Delete Temp" button.
 - `YtdlpPathModal.tsx` — inline modal for setting the path to `yt-dlp.exe`. Persisted via `save_ytdlp_path` Rust command.
@@ -79,9 +81,13 @@ A second Tauri window (`label: "downloader"`) opened from the main top bar via `
 
 ### Rust Backend (`src-tauri/src/`)
 
-- **`lib.rs`** — registers `tauri_plugin_libmpv::init()`, `tauri_plugin_dialog`, `tauri_plugin_opener`. At startup, resolves ffmpeg path AND probes HW encoder support (`probe_hw_support`), storing both in `FfmpegState`; also initialises `YtdlpState`. Registers 10 commands: `export_segments`, `pick_output_dir`, `get_hw_support` (ffmpeg) + `get_ytdlp_config`, `save_ytdlp_path`, `fetch_formats`, `download_video`, `get_temp_dir`, `clear_temp_dir`, `focus_main_window` (yt-dlp).
+- **`lib.rs`** — registers `tauri_plugin_libmpv::init()`, `tauri_plugin_dialog`, `tauri_plugin_opener`. At startup, resolves ffmpeg path AND probes HW encoder support (`probe_hw_support`), storing both in `FfmpegState`; also initialises `YtdlpState`. Registers 13 commands:
+  - **ffmpeg**: `export_segments`, `pick_output_dir`, `get_hw_support`
+  - **yt-dlp**: `get_ytdlp_config`, `save_ytdlp_path`, `save_cookie_settings`, `save_temp_dir`, `fetch_formats`, `download_video`, `get_temp_dir`, `clear_temp_dir`
+  - **project**: `default_save_dir`, `save_project`, `load_project`
+- **`project.rs`** — save/load `.vtproj.json` (schema version 1: `filePath`, `duration`, `playheadPosition`, `segments[]`). `default_save_dir` resolves `Documents\Video Trimmer\saves`. `load_project` validates the version field and returns a `Project` struct the frontend rehydrates (`App.tsx` restores the playhead via a `pendingSeekRef` after mpv finishes loading the file).
 - **`ffmpeg.rs`** — spawns `ffmpeg.exe` for each segment (or merge step), parses stderr `time=` for progress, emits `export-progress` events. Supports container override (source/mp4/mkv/webm — drives audio codec choice: WebM → libopus, others → aac) and HW encoder selection (NVENC/QSV/AMF) with auto-priority NVENC → QSV → AMF. CRF 0 (lossless) always forces the software encoder regardless of HW choice. On Windows, all spawned `ffmpeg.exe` invocations use `CREATE_NO_WINDOW` (`hide_console`) so no console flashes. Includes `TempCleanup` RAII guard so a mid-merge error doesn't leave temp segments behind. Has unit tests for arg building, progress parsing, and filename expansion.
-- **`ytdlp.rs`** — manages `YtdlpState` (yt-dlp exe path + Temp dir). Persists config to `app_local_data_dir/ytdlp_config.json`. `fetch_formats` runs `yt-dlp -j` and maps video heights to quality tiers; `download_video` runs with `--progress --newline --print after_move:filepath`, parses stderr on a background thread, and emits `ytdlp-progress` events. `focus_main_window` brings the main window to the foreground after "Load into Editor". Has unit tests for progress-line parsing. Requires `use tauri::Emitter;` for `app.emit()` to compile.
+- **`ytdlp.rs`** — manages `YtdlpState` (yt-dlp exe path + Temp dir + `CookieSource`). Persists config to `app_local_data_dir/ytdlp_config.json`. `CookieSource` is `None | Browser { browser, profile } | File { path }` and drives the `--cookies-from-browser`/`--cookies` flags so users can download login-gated videos. `fetch_formats` runs `yt-dlp -j` and maps video heights to quality tiers; `download_video` runs with `--progress --newline --print after_move:filepath`, parses stderr on a background thread, and emits `ytdlp-progress` events. Has unit tests for progress-line parsing. Requires `use tauri::Emitter;` for `app.emit()` to compile.
 - **`main.rs`** — minimal entry point, calls `edit_lib::run()`.
 
 ### libmpv setup
@@ -129,7 +135,7 @@ Segments cannot overlap. Handle dragging is clamped at neighboring segment bound
 - **Capabilities** — `libmpv:default` is required in `src-tauri/capabilities/default.json` to authorize the plugin's IPC commands. `core:webview:allow-create-webview-window` is also required to let the frontend open the downloader window.
 - **Keyboard shortcuts** (Space, ←/→, I, O, Delete) and global scroll-wheel seeking are disabled when any modal is open (export OR settings) or focus is in an input/select/textarea.
 - **Hardware encoder probe** — at startup, ffmpeg's `-encoders` output is grepped once for `h264_{nvenc,qsv,amf}` to populate `HwSupport`. The Settings modal queries this via the `get_hw_support` command to gate dropdown options.
-- **Persisted settings** — scroll-step values, HW encoder choice, and scroll-panel visibility are written to `localStorage` under key `video-trimmer-settings` by `useAppState`. Loaded synchronously at module init.
+- **Persisted settings** — split across two localStorage keys: `video-trimmer-settings` (scroll-step values, HW encoder, scroll-panel visibility — owned by `useAppState`) and `video-trimmer-shortcuts` (rebindable key bindings — owned by `useShortcuts`). Both load synchronously at module init.
 - **Design spec** is in `2026-04-08-video-trimmer-design.md` — refer to it for UI layout, color palette, timeline interactions, and export modal details.
 - **`--bg-modal` token** — modals (export, settings, yt-dlp path) use `--bg-modal: oklch(0.44 0.005 25)`, a dedicated step above `--bg-toolbar` (0.32) and `--bg-surface` (0.40), for better readability over the dark app chrome.
 

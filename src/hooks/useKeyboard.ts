@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { AppState, AppActions } from './useAppState'
-import { ShortcutAction, normaliseKey } from './useShortcuts'
+import { ShortcutAction, normaliseCombo } from './useShortcuts'
 
 type PlaybackCommands = {
   play:          () => void
@@ -59,7 +59,7 @@ export function useKeyboard(
         return
       }
 
-      const action = mapRef.current.get(normaliseKey(e.key))
+      const action = mapRef.current.get(normaliseCombo(e))
       if (!action) return
 
       switch (action) {
@@ -103,6 +103,18 @@ export function useKeyboard(
           if (s.selectedSegmentId) {
             a.deleteSegment(s.selectedSegmentId)
           }
+          break
+
+        case 'undo':
+          // Always preventDefault so an empty-stack press doesn't fall through
+          // to the browser's contenteditable Ctrl+Z.
+          e.preventDefault()
+          a.undo()
+          break
+
+        case 'redo':
+          e.preventDefault()
+          a.redo()
           break
       }
     }

@@ -20,6 +20,10 @@ type TimelineProps = {
   onSelectSegment: (id: string | null) => void
   onUpdateSegmentStart: (id: string, start: number) => void
   onUpdateSegmentEnd: (id: string, end: number) => void
+  /** Called on handle mousedown — captures pre-drag state for undo coalescing. */
+  onDragBegin: () => void
+  /** Called on handle mouseup — commits the coalesced snapshot to undo stack. */
+  onDragEnd: () => void
 }
 
 // ── Ruler tick interval ───────────────────────────────────────────────────────
@@ -52,6 +56,8 @@ export function Timeline({
   onSelectSegment,
   onUpdateSegmentStart,
   onUpdateSegmentEnd,
+  onDragBegin,
+  onDragEnd,
 }: TimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -124,6 +130,11 @@ export function Timeline({
       // Freeze the view origin for the duration of this drag.
       setDragViewStart(viewStartRef.current)
 
+      // Capture pre-drag state for undo coalescing. The matching onDragEnd in
+      // onMouseUp pushes one undo entry — no matter how many intermediate
+      // setSegmentStart/End calls fire from onMouseMove.
+      onDragBegin()
+
       function onMouseMove(ev: MouseEvent) {
         const w  = getWidth()
         const vd = visibleDurationRef.current
@@ -144,12 +155,13 @@ export function Timeline({
         document.removeEventListener('mouseup', onMouseUp)
         // Release the frozen origin → resume auto-centering on the playhead.
         setDragViewStart(null)
+        onDragEnd()
       }
 
       document.addEventListener('mousemove', onMouseMove)
       document.addEventListener('mouseup', onMouseUp)
     },
-    [onUpdateSegmentStart, onUpdateSegmentEnd, onSeek]
+    [onUpdateSegmentStart, onUpdateSegmentEnd, onSeek, onDragBegin, onDragEnd]
   )
 
   // ── Click ruler to seek ─────────────────────────────────────────────────

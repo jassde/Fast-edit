@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { Segment, HwEncoder, ProjectFile } from '../types'
 import { clamp, newId, pickColor } from '../utils'
 import {
@@ -93,6 +93,31 @@ export type AppState = {
   showScrollPanel: boolean
 }
 
+// ── Undo / Redo ───────────────────────────────────────────────────────────────
+// A Snapshot is the unit stored on the undo/redo stacks. Intentionally narrow:
+// only segments + selection. Playhead / playback / modal / settings state are
+// deliberately excluded — see docs/adr/0001-segment-undo-snapshot-stack.md.
+
+export type Snapshot = {
+  segments:          Segment[]
+  selectedSegmentId: string | null
+}
+
+const MAX_UNDO = 3
+
+function snapshotsEqual(a: Snapshot, b: Snapshot): boolean {
+  if (a.selectedSegmentId !== b.selectedSegmentId) return false
+  if (a.segments.length !== b.segments.length) return false
+  for (let i = 0; i < a.segments.length; i++) {
+    const x = a.segments[i]
+    const y = b.segments[i]
+    if (x.id !== y.id || x.start !== y.start || x.end !== y.end || x.color !== y.color) {
+      return false
+    }
+  }
+  return true
+}
+
 // ── Actions shape ─────────────────────────────────────────────────────────────
 
 export type AppActions = {
@@ -122,6 +147,21 @@ export type AppActions = {
   setMpvError: (msg: string | null) => void
   setExportError: (msg: string | null) => void
   loadProject: (p: ProjectFile) => void
+  /** Pop one undo snapshot and apply it; push current state onto redo stack. */
+  undo: () => void
+  /** Pop one redo snapshot and apply it; push current state onto undo stack. */
+  redo: () => void
+  /**
+   * Capture the current segments/selection ahead of a drag-style edit. Pair
+   * with endDrag(). Calling beginDrag without a matching endDrag is harmless —
+   * the captured snapshot lives in a ref and is overwritten by the next call.
+   */
+  beginDrag: () => void
+  /**
+   * Commit a drag-style edit. Pushes the snapshot captured by beginDrag onto
+   * the undo stack if (and only if) segments actually changed.
+   */
+  endDrag: () => void
 }
 
 // ── Initial state ─────────────────────────────────────────────────────────────
@@ -165,6 +205,38 @@ function findSorted(
 export function useAppState(): [AppState, AppActions] {
   const [state, setState] = useState<AppState>(INITIAL_STATE)
 
+  // Mirror of `state` for callbacks (undo/redo/beginDrag/endDrag) that need
+  // to read the latest committed state synchronously without going through a
+  // setState updater. The setState-updater path would be unsafe under React
+  // StrictMode for actions that mutate refs non-idempotently (e.g. pop), since
+  // updaters are double-invoked in dev.
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  // ── Undo / Redo stacks ──────────────────────────────────────────────────
+  // Kept as refs (not state) because the stacks themselves drive no UI;
+  // the visible feedback is the segments mutation, which already triggers a
+  // re-render via setState. See docs/adr/0001-segment-undo-snapshot-stack.md.
+  const undoStackRef  = useRef<Snapshot[]>([])
+  const redoStackRef  = useRef<Snapshot[]>([])
+  // Drag snapshot held between beginDrag() and endDrag().
+  const dragSnapRef   = useRef<Snapshot | null>(null)
+
+  /**
+   * Push a snapshot onto the undo stack and clear the redo stack. Called
+   * from each undoable mutator BEFORE the state change. Dedups against the
+   * top of the stack so React StrictMode's double-invoke of the updater
+   * function can't pollute the history.
+   */
+  const pushUndo = useCallback((snap: Snapshot) => {
+    const stack = undoStackRef.current
+    const top   = stack[stack.length - 1]
+    if (top && snapshotsEqual(top, snap)) return
+    stack.push(snap)
+    if (stack.length > MAX_UNDO) stack.shift()  // FIFO eviction
+    redoStackRef.current.length = 0             // any new action invalidates redo
+  }, [])
+
   // ── Segment mutations ────────────────────────────────────────────────────
 
   const addSegment = useCallback(() => {
@@ -196,21 +268,27 @@ export function useAppState(): [AppState, AppActions] {
         color: pickColor(s.segments.map(seg => seg.color)),
       }
 
+      pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
+
       return {
         ...s,
         segments: [...s.segments, newSeg],
         selectedSegmentId: newSeg.id,
       }
     })
-  }, [])
+  }, [pushUndo])
 
   const deleteSegment = useCallback((id: string) => {
-    setState(s => ({
-      ...s,
-      segments: s.segments.filter(seg => seg.id !== id),
-      selectedSegmentId: s.selectedSegmentId === id ? null : s.selectedSegmentId,
-    }))
-  }, [])
+    setState(s => {
+      if (!s.segments.some(seg => seg.id === id)) return s
+      pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
+      return {
+        ...s,
+        segments: s.segments.filter(seg => seg.id !== id),
+        selectedSegmentId: s.selectedSegmentId === id ? null : s.selectedSegmentId,
+      }
+    })
+  }, [pushUndo])
 
   const setSegmentStart = useCallback((id: string, start: number) => {
     setState(s => {
@@ -252,6 +330,8 @@ export function useAppState(): [AppState, AppActions] {
       const { sorted, idx, seg } = found
       const leftBound = idx > 0 ? sorted[idx - 1].end : 0
       const clamped   = clamp(start, leftBound, seg.end - MIN_FRAME_GAP_S)
+      if (clamped === seg.start) return s   // no-op: don't pollute undo
+      pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
       return {
         ...s,
         segments: s.segments.map(sg =>
@@ -259,7 +339,7 @@ export function useAppState(): [AppState, AppActions] {
         ),
       }
     })
-  }, [])
+  }, [pushUndo])
 
   const setSelectedEnd = useCallback((end: number) => {
     setState(s => {
@@ -269,6 +349,8 @@ export function useAppState(): [AppState, AppActions] {
       const { sorted, idx, seg } = found
       const rightBound = idx < sorted.length - 1 ? sorted[idx + 1].start : s.duration
       const clamped    = clamp(end, seg.start + MIN_FRAME_GAP_S, rightBound)
+      if (clamped === seg.end) return s   // no-op: don't pollute undo
+      pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
       return {
         ...s,
         segments: s.segments.map(sg =>
@@ -276,11 +358,16 @@ export function useAppState(): [AppState, AppActions] {
         ),
       }
     })
-  }, [])
+  }, [pushUndo])
 
   // ── Plain setters (all wrapped in useCallback for stable identity) ──────
 
-  const setFilePath = useCallback((path: string) =>
+  const setFilePath = useCallback((path: string) => {
+    // Snapshots reference segments tied to the old file; useless and confusing
+    // after a new file load. See ADR-0001.
+    undoStackRef.current.length = 0
+    redoStackRef.current.length = 0
+    dragSnapRef.current = null
     setState(s => ({
       ...s,
       filePath: path,
@@ -291,7 +378,8 @@ export function useAppState(): [AppState, AppActions] {
       fps: DEFAULT_FPS,
       isPlaying: false,
       mpvError: null,
-    })), [])
+    }))
+  }, [])
 
   const setDuration         = useCallback((d: number) => setState(s => ({ ...s, duration: d })), [])
   const setFps              = useCallback((fps: number) => setState(s => ({ ...s, fps })), [])
@@ -307,6 +395,10 @@ export function useAppState(): [AppState, AppActions] {
   const setExportError      = useCallback((msg: string | null) => setState(s => ({ ...s, exportError: msg })), [])
 
   const loadProject = useCallback((p: ProjectFile) => {
+    // Fresh document → fresh history. See ADR-0001.
+    undoStackRef.current.length = 0
+    redoStackRef.current.length = 0
+    dragSnapRef.current = null
     setState(s => ({
       ...s,
       filePath: p.filePath,
@@ -319,6 +411,57 @@ export function useAppState(): [AppState, AppActions] {
       mpvError: null,
     }))
   }, [])
+
+  // ── Undo / Redo actions ─────────────────────────────────────────────────
+  // These callbacks mutate refs (pop/push) synchronously, OUTSIDE the setState
+  // updater. Doing the pop inside the updater would be unsafe: React 18
+  // StrictMode double-invokes updaters in dev, which would pop two entries per
+  // press and silently corrupt the history. The setState call here only carries
+  // the segment-and-selection swap (idempotent under double-invocation).
+
+  const undo = useCallback(() => {
+    const popped = undoStackRef.current.pop()
+    if (!popped) return
+    const s = stateRef.current
+    const redoStack = redoStackRef.current
+    redoStack.push({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
+    if (redoStack.length > MAX_UNDO) redoStack.shift()
+    setState(prev => ({
+      ...prev,
+      segments: popped.segments,
+      selectedSegmentId: popped.selectedSegmentId,
+    }))
+  }, [])
+
+  const redo = useCallback(() => {
+    const popped = redoStackRef.current.pop()
+    if (!popped) return
+    const s = stateRef.current
+    const undoStack = undoStackRef.current
+    undoStack.push({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
+    if (undoStack.length > MAX_UNDO) undoStack.shift()
+    setState(prev => ({
+      ...prev,
+      segments: popped.segments,
+      selectedSegmentId: popped.selectedSegmentId,
+    }))
+  }, [])
+
+  const beginDrag = useCallback(() => {
+    const s = stateRef.current
+    dragSnapRef.current = { segments: s.segments, selectedSegmentId: s.selectedSegmentId }
+  }, [])
+
+  const endDrag = useCallback(() => {
+    const snap = dragSnapRef.current
+    dragSnapRef.current = null
+    if (!snap) return
+    const s = stateRef.current
+    const current: Snapshot = { segments: s.segments, selectedSegmentId: s.selectedSegmentId }
+    if (!snapshotsEqual(snap, current)) {
+      pushUndo(snap)
+    }
+  }, [pushUndo])
 
   const setFramesPerScrollTick = useCallback((n: number) => {
     setState(s => {
@@ -377,6 +520,10 @@ export function useAppState(): [AppState, AppActions] {
     setMpvError,
     setExportError,
     loadProject,
+    undo,
+    redo,
+    beginDrag,
+    endDrag,
   }), [
     setFilePath, setDuration, setFps, setPlayheadPosition, setIsPlaying, setIsMuted,
     addSegment, deleteSegment, selectSegment,
@@ -385,6 +532,7 @@ export function useAppState(): [AppState, AppActions] {
     openSettingsModal, closeSettingsModal,
     setFramesPerScrollTick, setSecondsPerShiftScrollTick, setHwEncoder, setShowScrollPanel,
     setMpvError, setExportError, loadProject,
+    undo, redo, beginDrag, endDrag,
   ])
 
   return [state, actions] as const

@@ -9,6 +9,8 @@ export type ShortcutAction =
   | 'setStart'
   | 'setEnd'
   | 'deleteSegment'
+  | 'undo'
+  | 'redo'
 
 export type ShortcutBindings = Record<ShortcutAction, string>
 
@@ -19,6 +21,8 @@ export const DEFAULT_SHORTCUTS: ShortcutBindings = {
   setStart:      'i',
   setEnd:        'o',
   deleteSegment: 'Delete',
+  undo:          'ctrl+z',
+  redo:          'ctrl+shift+z',
 }
 
 export const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
@@ -28,23 +32,84 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
   setStart:      'Set selected segment start',
   setEnd:        'Set selected segment end',
   deleteSegment: 'Delete selected segment',
+  undo:          'Undo last action',
+  redo:          'Redo last undone action',
 }
 
 const STORAGE_KEY = 'video-trimmer-shortcuts'
 
 /**
  * Normalise a KeyboardEvent.key for binding comparison. Letters are
- * lowercased so 'I' and 'i' both match the same binding.
+ * lowercased so 'I' and 'i' both match the same binding. Named keys
+ * (Delete, ArrowLeft, …) pass through unchanged.
  */
 export function normaliseKey(key: string): string {
   return key.length === 1 ? key.toLowerCase() : key
 }
 
-/** Human-readable label for a key value, used in the modal UI. */
+type KeyEventLike = {
+  ctrlKey:  boolean
+  shiftKey: boolean
+  altKey:   boolean
+  metaKey:  boolean
+  key:      string
+}
+
+/**
+ * Build the canonical Combo string for a KeyboardEvent. Format is
+ * `<modifiers>+<key>` with modifiers always in fixed order ctrl→shift→alt→meta
+ * and a normalised key. A bare keypress emits just the normalised key.
+ *
+ * Modifier-only events (e.key === 'Control'/'Shift'/'Alt'/'Meta') return the
+ * key itself, since they cannot form a complete Combo on their own.
+ */
+export function normaliseCombo(e: KeyEventLike): string {
+  if (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta') {
+    return e.key
+  }
+  const parts: string[] = []
+  if (e.ctrlKey)  parts.push('ctrl')
+  if (e.shiftKey) parts.push('shift')
+  if (e.altKey)   parts.push('alt')
+  if (e.metaKey)  parts.push('meta')
+  parts.push(normaliseKey(e.key))
+  return parts.join('+')
+}
+
+const MOD_LABELS: Record<string, string> = { ctrl: 'Ctrl', shift: 'Shift', alt: 'Alt', meta: 'Meta' }
+
+/** Human-readable label for a stored Combo, used in the modal UI. */
 export function formatKeyLabel(key: string): string {
   if (key === ' ') return 'Space'
+  // Detect combos by a modifier prefix rather than the bare presence of '+',
+  // so the literal '+' key (and combos whose key portion is '+') render
+  // correctly. The trailing `(.+)` captures the key portion in one piece —
+  // splitting on every '+' would shred 'shift++' into junk.
+  const m = key.match(/^((?:(?:ctrl|shift|alt|meta)\+)+)(.+)$/)
+  if (m) {
+    const mods = m[1].split('+').filter(Boolean).map(mod => MOD_LABELS[mod] ?? mod)
+    const k    = m[2]
+    const kLabel = k === ' ' ? 'Space' : (k.length === 1 ? k.toUpperCase() : k)
+    return [...mods, kLabel].join(' + ')
+  }
   if (key.length === 1) return key.toUpperCase()
   return key
+}
+
+/**
+ * Canonicalise an arbitrary binding string into the form the rest of this
+ * module expects: lowercase modifiers, normalised key portion. Used at the
+ * two boundaries where bindings enter the system (loadBindings, setBinding)
+ * so the lookup map and collision check can do plain string equality.
+ */
+function canonicaliseBinding(b: string): string {
+  // Bare key (no combo separator) → just normalise the key.
+  // Note: a literal '+' bound as the key has no modifier prefix; it falls
+  // through the regex below and is handled here.
+  const comboMatch = b.match(/^((?:(?:ctrl|shift|alt|meta)\+)+)(.+)$/i)
+  if (!comboMatch) return normaliseKey(b)
+  const mods = comboMatch[1].split('+').filter(Boolean).map(m => m.toLowerCase())
+  return [...mods, normaliseKey(comboMatch[2])].join('+')
 }
 
 function loadBindings(): ShortcutBindings {
@@ -55,7 +120,7 @@ function loadBindings(): ShortcutBindings {
     const out: ShortcutBindings = { ...DEFAULT_SHORTCUTS }
     for (const k of Object.keys(DEFAULT_SHORTCUTS) as ShortcutAction[]) {
       if (typeof parsed[k] === 'string' && parsed[k]!.length > 0) {
-        out[k] = parsed[k]!
+        out[k] = canonicaliseBinding(parsed[k]!)
       }
     }
     return out
@@ -71,11 +136,14 @@ function persist(b: ShortcutBindings) {
 export function useShortcuts() {
   const [bindings, setBindings] = useState<ShortcutBindings>(loadBindings)
 
-  const setBinding = useCallback((action: ShortcutAction, key: string) => {
+  const setBinding = useCallback((action: ShortcutAction, rawKey: string) => {
+    // Canonicalise at the boundary so the rest of the module can rely on
+    // stored bindings being in normal form.
+    const key = canonicaliseBinding(rawKey)
     setBindings(prev => {
       // Find if this key is already owned by a different action
       const displaced = (Object.keys(prev) as ShortcutAction[])
-        .find(k => k !== action && normaliseKey(prev[k]) === normaliseKey(key))
+        .find(k => k !== action && prev[k] === key)
 
       const next = { ...prev, [action]: key }
       if (displaced) {
@@ -92,11 +160,11 @@ export function useShortcuts() {
     persist(DEFAULT_SHORTCUTS)
   }, [])
 
-  /** Reverse map: normalised key → action, for fast lookup in the keydown handler. */
+  /** Reverse map: canonical binding string → action, for fast lookup in the keydown handler. */
   const keyToAction = useMemo(() => {
     const map = new Map<string, ShortcutAction>()
     for (const k of Object.keys(bindings) as ShortcutAction[]) {
-      map.set(normaliseKey(bindings[k]), k)
+      map.set(bindings[k], k)
     }
     return map
   }, [bindings])

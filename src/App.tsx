@@ -468,6 +468,8 @@ export default function App() {
             onSelectSegment={actions.selectSegment}
             onUpdateSegmentStart={actions.setSegmentStart}
             onUpdateSegmentEnd={actions.setSegmentEnd}
+            onDragBegin={actions.beginDrag}
+            onDragEnd={actions.endDrag}
           />
         </div>
 

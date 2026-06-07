@@ -4,6 +4,7 @@ import {
   ShortcutBindings,
   SHORTCUT_LABELS,
   formatKeyLabel,
+  normaliseCombo,
 } from '../hooks/useShortcuts'
 
 type ShortcutsModalProps = {
@@ -20,6 +21,8 @@ const ORDER: ShortcutAction[] = [
   'setStart',
   'setEnd',
   'deleteSegment',
+  'undo',
+  'redo',
 ]
 
 // Keys we refuse to bind because they'd trap the user or are modifier-only.
@@ -39,8 +42,10 @@ export function ShortcutsModal({ bindings, onRebind, onReset, onClose }: Shortcu
           setCapturing(null)
           return
         }
+        // Modifier-only keypresses leave capture active until a real key arrives,
+        // so the user can press Ctrl, then Z, to bind Ctrl+Z.
         if (FORBIDDEN_KEYS.has(e.key)) return
-        onRebind(capturing, e.key)
+        onRebind(capturing, normaliseCombo(e))
         setCapturing(null)
         return
       }
