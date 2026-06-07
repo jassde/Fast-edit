@@ -1541,6 +1541,32 @@ input[type="range"]::-moz-range-thumb {
     margin-left: 6px;
 }
 
+/* ── Fast-edit folder row (Settings modal) ───────────────────────────────── */
+.fast-edit-root-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+.fast-edit-root-path {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 6px 10px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+.modal-hint--error {
+    color: var(--danger);
+}
+
 /* ── Accent color swatches (Settings modal) ──────────────────────────────── */
 .modal-divider {
     height: 1px;

@@ -2,13 +2,15 @@ use std::{
     collections::HashMap,
     fs,
     io::{BufRead, BufReader},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{Arc, Mutex},
 };
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
+
+use crate::paths::AppPaths;
 
 // ── Cookie source ─────────────────────────────────────────────────────────────
 
@@ -36,10 +38,12 @@ pub struct YtdlpState {
 
 #[derive(Serialize, Deserialize, Default)]
 struct YtdlpConfigFile {
-    ytdlp_path:    Option<String>,
-    temp_dir:      Option<String>,
+    ytdlp_path: Option<String>,
     #[serde(default)]
     cookie_source: CookieSource,
+    // `temp_dir` is intentionally absent — the Temp dir is derived from the
+    // Fast-edit root (see `paths.rs`). Legacy configs that still have a
+    // `temp_dir` key are silently ignored by serde.
 }
 
 fn config_file_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -67,19 +71,10 @@ fn save_config(app: &AppHandle, cfg: &YtdlpConfigFile) -> Result<(), String> {
 
 // ── State initialiser (called from lib.rs setup) ──────────────────────────────
 
-pub fn init_state(app: &AppHandle) -> YtdlpState {
+pub fn init_state(app: &AppHandle, fast_edit_root: &Path) -> YtdlpState {
     let cfg = load_config(app);
     let ytdlp_path = cfg.ytdlp_path.map(PathBuf::from);
-
-    let temp_dir = cfg.temp_dir
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            app.path()
-                .app_local_data_dir()
-                .map(|d| d.join("Temp"))
-                .unwrap_or_else(|_| PathBuf::from("Temp"))
-        });
-
+    let temp_dir = fast_edit_root.join("Temp video files");
     YtdlpState { ytdlp_path, temp_dir, cookie_source: cfg.cookie_source }
 }
 
@@ -167,37 +162,6 @@ pub fn save_cookie_settings(
     let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
     guard.cookie_source = cookie_source;
     Ok(())
-}
-
-/// Validates the given path (creates it if needed), persists it as the temp
-/// directory, and updates running state so the next download uses it.
-///
-/// Validation: trims whitespace, rejects empty input, requires an absolute path
-/// (relative paths would resolve against the app's CWD, which is surprising and
-/// not portable across launches). Canonicalises after `create_dir_all` so the
-/// persisted value is the resolved absolute form.
-#[tauri::command]
-pub fn save_temp_dir(
-    path: String,
-    state: State<'_, Mutex<YtdlpState>>,
-    app: AppHandle,
-) -> Result<String, String> {
-    let new_path = validate_temp_dir_path(&path)?;
-
-    fs::create_dir_all(&new_path).map_err(|e| format!("Cannot create directory: {e}"))?;
-
-    // Canonicalise so the persisted value is the resolved absolute form (drops
-    // trailing slashes, resolves `..`, normalises separators).
-    let canonical = new_path.canonicalize().unwrap_or(new_path);
-    let canonical_str = canonical.to_string_lossy().to_string();
-
-    let mut cfg = load_config(&app);
-    cfg.temp_dir = Some(canonical_str.clone());
-    save_config(&app, &cfg)?;
-
-    let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
-    guard.temp_dir = canonical;
-    Ok(canonical_str)
 }
 
 /// Runs `yt-dlp -j <url>` and returns a curated list of quality tiers.
@@ -482,6 +446,16 @@ pub async fn download_video(
     .map_err(|e| e.to_string())?
 }
 
+/// Resolves and creates `<fast-edit-root>/Cookies`, returning the absolute path.
+/// Used by the Downloader's "Browse…" button to open the file picker in a
+/// predictable, app-owned location for cookies.txt files.
+#[tauri::command]
+pub fn default_cookies_dir(paths: State<'_, Mutex<AppPaths>>) -> Result<String, String> {
+    let dir = paths.lock().unwrap_or_else(|e| e.into_inner()).cookies_dir();
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
 /// Returns the absolute path of the Temp download folder.
 #[tauri::command]
 pub fn get_temp_dir(state: State<'_, Mutex<YtdlpState>>) -> String {
@@ -513,24 +487,6 @@ pub fn clear_temp_dir(state: State<'_, Mutex<YtdlpState>>) -> Result<(), String>
         }
     }
     Ok(())
-}
-
-// ── Temp dir validation ───────────────────────────────────────────────────────
-
-/// Trim, reject empty, and require an absolute path. Returned PathBuf is the
-/// pre-canonicalisation form (caller `create_dir_all`s, then canonicalises).
-fn validate_temp_dir_path(input: &str) -> Result<PathBuf, String> {
-    let trimmed = input.trim();
-    if trimmed.is_empty() {
-        return Err("Temp folder path cannot be empty.".to_string());
-    }
-    let p = PathBuf::from(trimmed);
-    if !p.is_absolute() {
-        return Err(format!(
-            "Temp folder must be an absolute path (got: {trimmed})."
-        ));
-    }
-    Ok(p)
 }
 
 // ── Cookie / stderr helpers ───────────────────────────────────────────────────
@@ -782,43 +738,4 @@ mod tests {
         assert_eq!(err, "Fetch failed.");
     }
 
-    #[test]
-    fn validate_temp_dir_rejects_empty() {
-        assert!(validate_temp_dir_path("").is_err());
-        assert!(validate_temp_dir_path("   ").is_err());
-        assert!(validate_temp_dir_path("\t\n").is_err());
-    }
-
-    #[test]
-    fn validate_temp_dir_rejects_relative() {
-        assert!(validate_temp_dir_path("Temp").is_err());
-        assert!(validate_temp_dir_path("./Temp").is_err());
-        assert!(validate_temp_dir_path("../Temp").is_err());
-    }
-
-    #[test]
-    fn validate_temp_dir_accepts_absolute() {
-        // Use platform-appropriate absolute path — Windows demands a drive letter,
-        // Unix-likes treat any leading `/` as absolute.
-        #[cfg(windows)]
-        let p = "C:\\Users\\test\\Temp";
-        #[cfg(not(windows))]
-        let p = "/tmp/test";
-
-        let result = validate_temp_dir_path(p).unwrap();
-        assert!(result.is_absolute());
-    }
-
-    #[test]
-    fn validate_temp_dir_trims_whitespace() {
-        #[cfg(windows)]
-        let p = "  C:\\Users\\test\\Temp  ";
-        #[cfg(not(windows))]
-        let p = "  /tmp/test  ";
-
-        let result = validate_temp_dir_path(p).unwrap();
-        // After trimming, the path is parsed cleanly with no leading/trailing spaces.
-        assert!(!result.to_string_lossy().starts_with(' '));
-        assert!(!result.to_string_lossy().ends_with(' '));
-    }
 }

@@ -1,8 +1,10 @@
 use std::fs;
-use std::path::PathBuf;
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::State;
+
+use crate::paths::AppPaths;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ProjectSegment {
@@ -37,21 +39,16 @@ fn validate_version(proj: &Project) -> Result<(), String> {
     Ok(())
 }
 
-fn resolve_default_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let docs = app.path().document_dir().map_err(|e| e.to_string())?;
-    Ok(docs.join("Video Trimmer").join("saves"))
-}
-
 #[tauri::command]
-pub fn default_save_dir(app: AppHandle) -> Result<String, String> {
-    let dir = resolve_default_dir(&app)?;
+pub fn default_save_dir(paths: State<'_, Mutex<AppPaths>>) -> Result<String, String> {
+    let dir = paths.lock().unwrap_or_else(|e| e.into_inner()).saves_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
 pub fn save_project(path: String, project: Project) -> Result<(), String> {
-    let pb = PathBuf::from(&path);
+    let pb = std::path::PathBuf::from(&path);
     if let Some(parent) = pb.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }

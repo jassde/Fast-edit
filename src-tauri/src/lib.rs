@@ -1,4 +1,5 @@
 mod ffmpeg;
+mod paths;
 mod project;
 mod ytdlp;
 
@@ -28,8 +29,15 @@ pub fn run() {
                 guard.hw_support  = hw_support;
             }
 
-            // Initialise yt-dlp state: loads persisted exe path and resolves the Temp dir.
-            let ytdlp_state = ytdlp::init_state(&app.handle());
+            // Initialise the configurable Fast-edit root FIRST — ytdlp's temp
+            // dir derives from it.
+            let app_paths = paths::init_state(&app.handle());
+            let root = app_paths.fast_edit_root.clone();
+            app.manage(Mutex::new(app_paths));
+
+            // Initialise yt-dlp state: loads persisted exe path and uses the
+            // Fast-edit root for the Temp dir.
+            let ytdlp_state = ytdlp::init_state(&app.handle(), &root);
             app.manage(Mutex::new(ytdlp_state));
 
             Ok(())
@@ -41,14 +49,16 @@ pub fn run() {
             ytdlp::get_ytdlp_config,
             ytdlp::save_ytdlp_path,
             ytdlp::save_cookie_settings,
-            ytdlp::save_temp_dir,
             ytdlp::fetch_formats,
             ytdlp::download_video,
             ytdlp::get_temp_dir,
             ytdlp::clear_temp_dir,
+            ytdlp::default_cookies_dir,
             project::default_save_dir,
             project::save_project,
             project::load_project,
+            paths::get_fast_edit_root,
+            paths::set_fast_edit_root,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

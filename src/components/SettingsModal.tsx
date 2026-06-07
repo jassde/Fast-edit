@@ -19,10 +19,13 @@ type SettingsModalProps = {
   hwEncoder:                 HwEncoder
   hwSupport:                 HwSupport
   accentColor:               AccentColor
+  fastEditRoot:              string
+  rootChangeError:           string | null
   onChangeFrames:            (n: number) => void
   onChangeSeconds:           (n: number) => void
   onChangeHwEncoder:         (e: HwEncoder) => void
   onChangeAccentColor:       (c: AccentColor) => void
+  onChangeFastEditRoot:      () => void
   onClose:                   () => void
 }
 
@@ -42,10 +45,13 @@ export function SettingsModal({
   hwEncoder,
   hwSupport,
   accentColor,
+  fastEditRoot,
+  rootChangeError,
   onChangeFrames,
   onChangeSeconds,
   onChangeHwEncoder,
   onChangeAccentColor,
+  onChangeFastEditRoot,
   onClose,
 }: SettingsModalProps) {
   // Always offer Auto and Software; gate vendor-specific options on whether
@@ -74,6 +80,24 @@ export function SettingsModal({
       <div className="modal" role="dialog" aria-modal="true" aria-label="Settings">
 
         <div className="modal-title">Settings</div>
+
+        {/* Fast-edit folder */}
+        <div className="modal-field">
+          <span className="modal-label">Fast-edit folder</span>
+          <div className="fast-edit-root-row">
+            <code className="fast-edit-root-path" title={fastEditRoot}>{fastEditRoot || '(loading…)'}</code>
+            <button className="btn" onClick={onChangeFastEditRoot}>Change location…</button>
+          </div>
+          {rootChangeError && (
+            <span className="modal-hint modal-hint--error">{rootChangeError}</span>
+          )}
+          <span className="modal-hint">
+            Cookies, project saves, and yt-dlp downloads all live under this folder.
+            Changing the location moves the existing contents.
+          </span>
+        </div>
+
+        <hr className="modal-divider" />
 
         {/* Frames-per-scroll-tick */}
         <div className="modal-field">

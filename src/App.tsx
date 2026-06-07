@@ -64,6 +64,34 @@ export default function App() {
       });
   }, []);
 
+  // ── Fast-edit root folder ────────────────────────────────────────────────
+  // The configurable parent for cookies, saves, and yt-dlp temp downloads.
+  // Backend owns persistence (app_paths.json); we just mirror the current
+  // value for the Settings UI.
+  const [fastEditRoot, setFastEditRoot] = useState<string>("");
+  const [rootChangeError, setRootChangeError] = useState<string | null>(null);
+  useEffect(() => {
+    invoke<string>("get_fast_edit_root").then(setFastEditRoot).catch(() => {});
+  }, []);
+
+  const handleChangeFastEditRoot = useCallback(async () => {
+    setRootChangeError(null);
+    const picked = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: fastEditRoot || undefined,
+    });
+    if (!picked || typeof picked !== "string") return;
+    try {
+      const canonical = await invoke<string>("set_fast_edit_root", {
+        newPath: picked,
+      });
+      setFastEditRoot(canonical);
+    } catch (e) {
+      setRootChangeError(String(e));
+    }
+  }, [fastEditRoot]);
+
   // mpv backend hook — pass the ref object, not .current, so useMpv reads the
   // live DOM element after mount (videoPanelRef.current is null on first render).
   const playback = useMpv(actions, videoPanelRef, state.filePath);
@@ -107,7 +135,7 @@ export default function App() {
 
   // ── Save / Load project ────────────────────────────────────────────────
   // Project files (.vtproj.json) persist filePath + segments + playhead so a
-  // session can be resumed later. Default dir is Documents\Video Trimmer\saves.
+  // session can be resumed later. Default dir is Documents\Fast-edit\saves.
   const pendingSeekRef = useRef<number | null>(null);
 
   const handleSaveProject = useCallback(async () => {
@@ -672,10 +700,13 @@ export default function App() {
           hwEncoder={state.hwEncoder}
           hwSupport={hwSupport}
           accentColor={state.accentColor}
+          fastEditRoot={fastEditRoot}
+          rootChangeError={rootChangeError}
           onChangeFrames={actions.setFramesPerScrollTick}
           onChangeSeconds={actions.setSecondsPerShiftScrollTick}
           onChangeHwEncoder={actions.setHwEncoder}
           onChangeAccentColor={actions.setAccentColor}
+          onChangeFastEditRoot={handleChangeFastEditRoot}
           onClose={actions.closeSettingsModal}
         />
       )}

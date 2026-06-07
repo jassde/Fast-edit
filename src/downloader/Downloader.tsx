@@ -22,14 +22,11 @@ export default function Downloader() {
   const [clearingTemp, setClearingTemp]   = useState(false)
   const [cookieSource, setCookieSource]   = useState<CookieSource>({ type: 'none' })
   const [savingCookies, setSavingCookies] = useState(false)
-  const [tempDirInput, setTempDirInput]   = useState('')
-  const [savingTempPath, setSavingTempPath] = useState(false)
 
   useEffect(() => {
     invoke<YtdlpConfig>('get_ytdlp_config').then(cfg => {
       setYtdlpPath(cfg.ytdlpPath)
       setTempDir(cfg.tempDir)
-      setTempDirInput(cfg.tempDir)
       setCookieSource(cfg.cookieSource)
     })
   }, [])
@@ -97,7 +94,13 @@ export default function Downloader() {
   }, [])
 
   const browseCookieFile = useCallback(async () => {
-    const selected = await open({ multiple: false, filters: [{ name: 'Cookie file', extensions: ['txt'] }] })
+    let defaultPath: string | undefined
+    try { defaultPath = await invoke<string>('default_cookies_dir') } catch { /* ignore */ }
+    const selected = await open({
+      multiple: false,
+      defaultPath,
+      filters: [{ name: 'Cookie file', extensions: ['txt'] }],
+    })
     if (typeof selected === 'string') {
       await handleCookieSave({ type: 'file', path: selected })
     }
@@ -112,25 +115,6 @@ export default function Downloader() {
       setErrorMsg(`Could not open folder: ${e}`)
     }
   }, [tempDir])
-
-  const handleBrowseTempDir = useCallback(async () => {
-    const selected = await open({ directory: true, multiple: false })
-    if (typeof selected === 'string') setTempDirInput(selected)
-  }, [])
-
-  const handleSaveTempDir = useCallback(async () => {
-    setSavingTempPath(true)
-    try {
-      const canonical = await invoke<string>('save_temp_dir', { path: tempDirInput })
-      setTempDir(canonical)
-      setTempDirInput(canonical)
-      setErrorMsg('')
-    } catch (e) {
-      setErrorMsg(String(e))
-    } finally {
-      setSavingTempPath(false)
-    }
-  }, [tempDirInput])
 
   const handleClearTemp = useCallback(async () => {
     // Confirm before deleting — destructive and irreversible. If the user just
@@ -410,29 +394,6 @@ export default function Downloader() {
           </button>
         </div>
 
-        <div className="dl-footer-hint">
-          <span className="dl-temp-label">Temp folder</span>
-          <div className="dl-temp-path-row">
-            <input
-              className="modal-input dl-temp-input"
-              type="text"
-              value={tempDirInput}
-              onChange={e => setTempDirInput(e.target.value)}
-              placeholder="C:\path\to\temp"
-              disabled={isDownloading}
-            />
-            <button className="btn" onClick={handleBrowseTempDir} disabled={isDownloading}>
-              Browse…
-            </button>
-            <button
-              className="btn"
-              onClick={handleSaveTempDir}
-              disabled={isDownloading || savingTempPath || tempDirInput === tempDir}
-            >
-              {savingTempPath ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
       </div>
 
       {showPathModal && (
