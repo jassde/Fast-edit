@@ -464,10 +464,6 @@ body,
     min-width: 0;
 }
 
-.pc-spacer {
-    flex: 1;
-}
-
 .pc-sep {
     width: 1px;
     height: 24px;

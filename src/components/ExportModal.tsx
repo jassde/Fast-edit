@@ -239,6 +239,7 @@ export function ExportModal({
   // source" on an .mp4 input doesn't offer VP9 (invalid in the mp4 muxer).
   const allowedCodecs = codecsFor(resolveContainer(s.container, inputExt))
   const showRemuxWarning = s.codecMode === 'copy' && s.container !== 'source' && s.container !== 'mkv'
+  const crfLabel = crfQualityLabel(s.crf)
 
   // Change the output container; if re-encoding and the current codec isn't
   // valid for the new (resolved) container, snap it to the first allowed codec.
@@ -374,9 +375,9 @@ export function ExportModal({
                       Quality (CRF {s.crf})
                       <span
                         className="crf-quality-label"
-                        style={{ background: `color-mix(in oklch, ${crfQualityLabel(s.crf).color} 18%, transparent)`, color: crfQualityLabel(s.crf).color }}
+                        style={{ background: `color-mix(in oklch, ${crfLabel.color} 18%, transparent)`, color: crfLabel.color }}
                       >
-                        {crfQualityLabel(s.crf).text}
+                        {crfLabel.text}
                       </span>
                     </span>
                     <div className="settings-slider-row" style={{ marginTop: 0 }}>

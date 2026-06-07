@@ -1,6 +1,6 @@
 import "./App.css";
 import { useRef, useCallback, useEffect, useState, useMemo } from "react";
-import { defaultZoomForDuration } from "./utils";
+import { defaultZoomForDuration, loadBool, saveBool } from "./utils";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -32,19 +32,14 @@ export default function App() {
   const [state, actions] = useAppState();
   const videoPanelRef = useRef<HTMLDivElement>(null);
 
-  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
-    try {
-      return localStorage.getItem("sidebar-expanded") === "1";
-    } catch {
-      return false;
-    }
-  });
+  const [sidebarExpanded, setSidebarExpanded] = useState(() =>
+    loadBool("sidebar-expanded", false),
+  );
   const toggleSidebar = useCallback(() => {
     setSidebarExpanded((prev) => {
-      try {
-        localStorage.setItem("sidebar-expanded", prev ? "0" : "1");
-      } catch {}
-      return !prev;
+      const next = !prev;
+      saveBool("sidebar-expanded", next);
+      return next;
     });
   }, []);
 

@@ -100,3 +100,26 @@ export function expandFilename(
   }
   return trimmed + ext
 }
+
+// ── Tiny localStorage helpers ────────────────────────────────────────────────
+// Swallow exceptions (Safari private mode, disabled storage, quota errors)
+// and normalize the "0"/"1" boolean encoding used across the app.
+
+export function loadBool(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key)
+    if (v === '1') return true
+    if (v === '0') return false
+    return fallback
+  } catch {
+    return fallback
+  }
+}
+
+export function saveBool(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, value ? '1' : '0')
+  } catch {
+    /* storage unavailable — preference won't persist this session */
+  }
+}

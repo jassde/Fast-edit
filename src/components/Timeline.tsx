@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useMemo, useEffect } from 'react'
+import { Fragment, useRef, useCallback, useState, useMemo, useEffect } from 'react'
 import { Segment } from '../types'
 import { clamp, pixelToTime, timeToPixel, formatTime } from '../utils'
 import { MIN_SEGMENT_PX } from '../constants'
@@ -29,7 +29,10 @@ type TimelineProps = {
 // ── Ruler tick interval ───────────────────────────────────────────────────────
 
 // Major intervals that labels snap to. Minor ticks subdivide each major interval.
-const NICE_INTERVALS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
+// Smallest is 1s — sub-second intervals would force formatTickLabel to round
+// to integers, causing adjacent labels to collide (e.g. 0.5s and 1.0s both
+// rendering as "0:01").
+const NICE_INTERVALS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
 
 /** How many minor subdivisions between each major (label-bearing) tick. */
 const SUBDIVISIONS = 5
@@ -216,14 +219,14 @@ export function Timeline({
       const x = timeToPixel(t - effectiveViewStart, w, visibleDuration)
 
       els.push(
-        <div key={t}>
+        <Fragment key={t}>
           <div className={`ruler-tick${isMajor ? ' major' : ''}`} style={{ left: x }} />
           {isMajor && (
             <span className="ruler-label" style={{ left: x }}>
               {formatTickLabel(t)}
             </span>
           )}
-        </div>
+        </Fragment>
       )
     }
     return els
