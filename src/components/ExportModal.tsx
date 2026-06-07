@@ -71,6 +71,16 @@ const CONTAINER_LABEL: Record<Container, string> = {
   webm:   'WebM',
 }
 
+function crfQualityLabel(crf: number): { text: string; color: string } {
+  if (crf === 0)  return { text: 'Lossless',            color: 'oklch(0.75 0.18 155)' }
+  if (crf <= 14)  return { text: 'Visually lossless',   color: 'oklch(0.72 0.14 155)' }
+  if (crf <= 22)  return { text: 'High quality',        color: 'oklch(0.72 0.14 155)' }
+  if (crf <= 28)  return { text: 'Good',                color: 'oklch(0.78 0.16 65)' }
+  if (crf <= 35)  return { text: 'Fair',                color: 'oklch(0.70 0.16 50)' }
+  if (crf <= 45)  return { text: 'Low quality',         color: 'oklch(0.66 0.20 22)' }
+  return                  { text: 'Very low',            color: 'oklch(0.60 0.22 22)' }
+}
+
 const CONTAINER_EXT: Record<Container, string | null> = {
   source: null,  // resolved against the input extension at render time
   mp4:    '.mp4',
@@ -362,6 +372,12 @@ export function ExportModal({
                   <div style={{ marginTop: 10 }}>
                     <span className="modal-label" style={{ display: 'block', marginBottom: 4 }}>
                       Quality (CRF {s.crf})
+                      <span
+                        className="crf-quality-label"
+                        style={{ background: `color-mix(in oklch, ${crfQualityLabel(s.crf).color} 18%, transparent)`, color: crfQualityLabel(s.crf).color }}
+                      >
+                        {crfQualityLabel(s.crf).text}
+                      </span>
                     </span>
                     <div className="settings-slider-row" style={{ marginTop: 0 }}>
                       <span className="settings-slider-bound">0</span>

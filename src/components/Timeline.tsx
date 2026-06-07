@@ -28,20 +28,30 @@ type TimelineProps = {
 
 // ── Ruler tick interval ───────────────────────────────────────────────────────
 
+// Major intervals that labels snap to. Minor ticks subdivide each major interval.
 const NICE_INTERVALS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
+
+/** How many minor subdivisions between each major (label-bearing) tick. */
+const SUBDIVISIONS = 5
 
 function computeTickInterval(visibleDuration: number, widthPx: number): number {
   if (widthPx === 0 || visibleDuration === 0) return 1
   const pixelsPerSecond = widthPx / visibleDuration
-  const TARGET_PX = 60
+  // Target ~80 px between major ticks → more labels visible at once
+  const TARGET_PX = 80
   const rawInterval = TARGET_PX / pixelsPerSecond
   return NICE_INTERVALS.find(v => v >= rawInterval) ?? 3600
 }
 
+/** Format seconds as H:MM:SS, M:SS, or 0:SS depending on magnitude. */
 function formatTickLabel(seconds: number): string {
-  if (seconds < 60)   return `${seconds}s`
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`
-  return `${Math.floor(seconds / 3600)}h${Math.round((seconds % 3600) / 60)}m`
+  const s = Math.round(seconds)
+  if (s < 0) return '0:00'
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+  return `${m}:${String(sec).padStart(2, '0')}`
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -191,18 +201,24 @@ export function Timeline({
   // React skips re-rendering them — only the inline playhead below moves.
   const rulerTicks = useMemo(() => {
     if (!(duration > 0 && w > 0 && visibleDuration > 0)) return null
-    const tickInterval = computeTickInterval(visibleDuration, w)
-    const firstTick = Math.floor(effectiveViewStart / tickInterval) * tickInterval
+
+    const majorInterval = computeTickInterval(visibleDuration, w)
+    const minorInterval = majorInterval / SUBDIVISIONS
+    const firstTick = Math.floor(effectiveViewStart / minorInterval) * minorInterval
     const lastTick  = effectiveViewStart + visibleDuration
     const els: React.ReactNode[] = []
-    for (let t = firstTick; t <= lastTick; t += tickInterval) {
+
+    for (let t = firstTick; t <= lastTick; t += minorInterval) {
       if (t < 0) continue
-      const major = Math.round(t / tickInterval) % 5 === 0
+      // A tick is "major" when it falls on a multiple of the major interval.
+      // Round to avoid float drift (e.g. 0.999999 vs 1.0).
+      const isMajor = Math.abs(Math.round(t / majorInterval) * majorInterval - t) < 1e-6
       const x = timeToPixel(t - effectiveViewStart, w, visibleDuration)
+
       els.push(
         <div key={t}>
-          <div className={`ruler-tick ${major ? 'major' : ''}`} style={{ left: x }} />
-          {major && (
+          <div className={`ruler-tick${isMajor ? ' major' : ''}`} style={{ left: x }} />
+          {isMajor && (
             <span className="ruler-label" style={{ left: x }}>
               {formatTickLabel(t)}
             </span>
