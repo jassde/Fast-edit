@@ -43,6 +43,15 @@ export default function App() {
     });
   }, []);
 
+  // Keep <html data-accent="..."> in sync with the persisted accent. main.tsx
+  // sets the initial value pre-mount; this catches changes from the Settings
+  // modal at runtime. Each window owns its own document — the downloader and
+  // scroll-panel windows read the same localStorage key in their own main.tsx
+  // pre-mount, so they stay consistent after a relaunch.
+  useEffect(() => {
+    document.documentElement.dataset.accent = state.accentColor;
+  }, [state.accentColor]);
+
   // Probe HW-encoder support once at startup. The Settings modal uses this to
   // know which vendor options to expose. Defaults to "no support" so the
   // dropdown still renders Auto + Software if the probe fails.
@@ -361,9 +370,6 @@ export default function App() {
       <div className="app-top">
         {/* ── Sidebar ── */}
         <div className={`sidebar${sidebarExpanded ? " expanded" : ""}`}>
-          <div className="sidebar-brand" aria-hidden="true" title="Video Trimmer">
-            <Clapperboard size={18} strokeWidth={2} />
-          </div>
           <button
             className="sidebar-toggle"
             onClick={toggleSidebar}
@@ -557,14 +563,20 @@ export default function App() {
                     <span className="onboarding-step-num">1</span>
                     <span className="onboarding-step-text">Open a video</span>
                   </div>
-                  <div className="onboarding-step-connector" aria-hidden="true" />
+                  <div
+                    className="onboarding-step-connector"
+                    aria-hidden="true"
+                  />
                   <div className="onboarding-step">
                     <span className="onboarding-step-num">2</span>
                     <span className="onboarding-step-text">
                       Mark with <kbd>I</kbd> / <kbd>O</kbd>
                     </span>
                   </div>
-                  <div className="onboarding-step-connector" aria-hidden="true" />
+                  <div
+                    className="onboarding-step-connector"
+                    aria-hidden="true"
+                  />
                   <div className="onboarding-step">
                     <span className="onboarding-step-num">3</span>
                     <span className="onboarding-step-text">Export</span>
@@ -659,9 +671,11 @@ export default function App() {
           secondsPerShiftScrollTick={state.secondsPerShiftScrollTick}
           hwEncoder={state.hwEncoder}
           hwSupport={hwSupport}
+          accentColor={state.accentColor}
           onChangeFrames={actions.setFramesPerScrollTick}
           onChangeSeconds={actions.setSecondsPerShiftScrollTick}
           onChangeHwEncoder={actions.setHwEncoder}
+          onChangeAccentColor={actions.setAccentColor}
           onClose={actions.closeSettingsModal}
         />
       )}

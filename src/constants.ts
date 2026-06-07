@@ -31,6 +31,29 @@ export const MAX_SECONDS_PER_SHIFT_SCROLL_TICK     = 20
 
 export const SETTINGS_STORAGE_KEY = 'video-trimmer-settings'
 
+// ── Accent color presets ─────────────────────────────────────────────────────
+// The actual OKLCH values live in App.css under `:root[data-accent="..."]`.
+// Keep this list in sync with that selector set and the swatch UI in SettingsModal.
+export const ACCENT_COLORS = ['red', 'gold', 'green', 'blue', 'purple'] as const
+export type AccentColor = (typeof ACCENT_COLORS)[number]
+export const DEFAULT_ACCENT_COLOR: AccentColor = 'red'
+
+export const ACCENT_PREVIEW: Record<AccentColor, string> = {
+  red:    'oklch(0.68 0.19 25)',
+  gold:   'oklch(0.78 0.16 65)',
+  green:  'oklch(0.74 0.17 150)',
+  blue:   'oklch(0.68 0.16 250)',
+  purple: 'oklch(0.65 0.20 310)',
+}
+
+export const ACCENT_LABELS: Record<AccentColor, string> = {
+  red:    'Red',
+  gold:   'Gold',
+  green:  'Green',
+  blue:   'Blue',
+  purple: 'Purple',
+}
+
 // Default hardware-encoder choice. `auto` picks the best available HW encoder
 // at export time (NVENC > QSV > AMF), falling back to software if none.
 export const DEFAULT_HW_ENCODER = 'auto' as const

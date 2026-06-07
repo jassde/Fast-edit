@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "video-edit",
+  "productName": "Fast-edit",
   "version": "0.1.0",
-  "identifier": "com.video-edit.app",
+  "identifier": "com.Fast-edit.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "Video Trimmer",
-        "width": 1280,
-        "height": 800,
+        "title": "Fast-edit",
+        "width": 1395,
+        "height": 870,
         "minWidth": 900,
         "minHeight": 600,
         "transparent": true
@@ -37,9 +37,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "lib/**/*"
-    ],
+    "resources": ["lib/**/*"],
     "windows": {
       "nsis": {
         "installMode": "perMachine"

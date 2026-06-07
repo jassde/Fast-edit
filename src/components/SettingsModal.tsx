@@ -1,9 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, CSSProperties } from 'react'
 import {
   MIN_FRAMES_PER_SCROLL_TICK,
   MAX_FRAMES_PER_SCROLL_TICK,
   MIN_SECONDS_PER_SHIFT_SCROLL_TICK,
   MAX_SECONDS_PER_SHIFT_SCROLL_TICK,
+  ACCENT_COLORS,
+  ACCENT_PREVIEW,
+  ACCENT_LABELS,
+  AccentColor,
 } from '../constants'
 import { HwEncoder, HwSupport } from '../types'
 
@@ -14,9 +18,11 @@ type SettingsModalProps = {
   secondsPerShiftScrollTick: number
   hwEncoder:                 HwEncoder
   hwSupport:                 HwSupport
+  accentColor:               AccentColor
   onChangeFrames:            (n: number) => void
   onChangeSeconds:           (n: number) => void
   onChangeHwEncoder:         (e: HwEncoder) => void
+  onChangeAccentColor:       (c: AccentColor) => void
   onClose:                   () => void
 }
 
@@ -35,9 +41,11 @@ export function SettingsModal({
   secondsPerShiftScrollTick,
   hwEncoder,
   hwSupport,
+  accentColor,
   onChangeFrames,
   onChangeSeconds,
   onChangeHwEncoder,
+  onChangeAccentColor,
   onClose,
 }: SettingsModalProps) {
   // Always offer Auto and Software; gate vendor-specific options on whether
@@ -104,6 +112,29 @@ export function SettingsModal({
               onChange={e => onChangeSeconds(Number(e.target.value))}
             />
             <span className="settings-slider-bound">{MAX_SECONDS_PER_SHIFT_SCROLL_TICK}</span>
+          </div>
+        </div>
+
+        {/* Divider between scroll sliders and accent picker */}
+        <hr className="modal-divider" />
+
+        {/* Accent color */}
+        <div className="modal-field">
+          <span className="modal-label">Accent color</span>
+          <div className="accent-swatches" role="radiogroup" aria-label="Accent color">
+            {ACCENT_COLORS.map(c => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={accentColor === c}
+                aria-label={ACCENT_LABELS[c]}
+                title={ACCENT_LABELS[c]}
+                className={`accent-swatch${accentColor === c ? ' selected' : ''}`}
+                style={{ '--swatch-color': ACCENT_PREVIEW[c] } as CSSProperties}
+                onClick={() => onChangeAccentColor(c)}
+              />
+            ))}
           </div>
         </div>
 

@@ -13,9 +13,13 @@ import {
   DEFAULT_HW_ENCODER,
   SETTINGS_STORAGE_KEY,
   DEFAULT_FPS,
+  ACCENT_COLORS,
+  DEFAULT_ACCENT_COLOR,
+  AccentColor,
 } from '../constants'
 
 const VALID_HW_ENCODERS: ReadonlySet<HwEncoder> = new Set(['none', 'auto', 'nvenc', 'qsv', 'amf'])
+const VALID_ACCENT_COLORS: ReadonlySet<AccentColor> = new Set(ACCENT_COLORS)
 
 // ── Persisted settings ────────────────────────────────────────────────────────
 
@@ -24,6 +28,7 @@ type PersistedSettings = {
   secondsPerShiftScrollTick: number
   hwEncoder:                 HwEncoder
   showScrollPanel:           boolean
+  accentColor:               AccentColor
 }
 
 function loadSettings(): PersistedSettings {
@@ -32,6 +37,7 @@ function loadSettings(): PersistedSettings {
     secondsPerShiftScrollTick: DEFAULT_SECONDS_PER_SHIFT_SCROLL_TICK,
     hwEncoder:                 DEFAULT_HW_ENCODER,
     showScrollPanel:           false,
+    accentColor:               DEFAULT_ACCENT_COLOR,
   }
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY)
@@ -48,6 +54,7 @@ function loadSettings(): PersistedSettings {
       ),
       hwEncoder: VALID_HW_ENCODERS.has(p.hwEncoder) ? p.hwEncoder : fb.hwEncoder,
       showScrollPanel: p.showScrollPanel === true,
+      accentColor: VALID_ACCENT_COLORS.has(p.accentColor) ? p.accentColor : fb.accentColor,
     }
   } catch {
     return fb
@@ -69,6 +76,7 @@ function persistFromAppState(s: AppState) {
     secondsPerShiftScrollTick: s.secondsPerShiftScrollTick,
     hwEncoder:                 s.hwEncoder,
     showScrollPanel:           s.showScrollPanel,
+    accentColor:               s.accentColor,
   })
 }
 
@@ -91,6 +99,7 @@ export type AppState = {
   secondsPerShiftScrollTick: number
   hwEncoder: HwEncoder
   showScrollPanel: boolean
+  accentColor: AccentColor
 }
 
 // ── Undo / Redo ───────────────────────────────────────────────────────────────
@@ -144,6 +153,7 @@ export type AppActions = {
   setSecondsPerShiftScrollTick: (n: number) => void
   setHwEncoder: (e: HwEncoder) => void
   setShowScrollPanel: (b: boolean) => void
+  setAccentColor: (c: AccentColor) => void
   setMpvError: (msg: string | null) => void
   setExportError: (msg: string | null) => void
   loadProject: (p: ProjectFile) => void
@@ -185,6 +195,7 @@ const INITIAL_STATE: AppState = {
   secondsPerShiftScrollTick: PERSISTED.secondsPerShiftScrollTick,
   hwEncoder:                 PERSISTED.hwEncoder,
   showScrollPanel:           PERSISTED.showScrollPanel,
+  accentColor:               PERSISTED.accentColor,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -495,6 +506,14 @@ export function useAppState(): [AppState, AppActions] {
     })
   }, [])
 
+  const setAccentColor = useCallback((c: AccentColor) => {
+    setState(s => {
+      const next = { ...s, accentColor: c }
+      persistFromAppState(next)
+      return next
+    })
+  }, [])
+
   const actions: AppActions = useMemo(() => ({
     setFilePath,
     setDuration,
@@ -517,6 +536,7 @@ export function useAppState(): [AppState, AppActions] {
     setSecondsPerShiftScrollTick,
     setHwEncoder,
     setShowScrollPanel,
+    setAccentColor,
     setMpvError,
     setExportError,
     loadProject,
@@ -530,7 +550,7 @@ export function useAppState(): [AppState, AppActions] {
     setSegmentStart, setSegmentEnd, setSelectedStart, setSelectedEnd,
     openExportModal, closeExportModal,
     openSettingsModal, closeSettingsModal,
-    setFramesPerScrollTick, setSecondsPerShiftScrollTick, setHwEncoder, setShowScrollPanel,
+    setFramesPerScrollTick, setSecondsPerShiftScrollTick, setHwEncoder, setShowScrollPanel, setAccentColor,
     setMpvError, setExportError, loadProject,
     undo, redo, beginDrag, endDrag,
   ])
