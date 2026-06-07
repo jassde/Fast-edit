@@ -28,8 +28,6 @@ The following are explicitly **not** Actions and do not appear in the undo histo
 - Settings changes (HW encoder, scroll-step values, scroll-panel visibility).
 - File load (`setFilePath`) or project load (`loadProject`) — these wipe segments entirely, and undoing back to a previous file would be surprising. Both events **clear** the undo and redo stacks instead.
 
-See [docs/adr/0001-segment-undo-snapshot-stack.md](docs/adr/0001-segment-undo-snapshot-stack.md) for why the scope is this narrow.
-
 ## Segment
 
 A contiguous time range `[start, end)` of the loaded video that the user has marked for export. Stored as `{ id, start, end, color }`. Segments cannot overlap; handle drags are clamped at neighboring segment boundaries. Invariant maintained in `useAppState`'s segment-mutation helpers.

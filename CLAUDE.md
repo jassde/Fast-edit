@@ -49,7 +49,7 @@ There is no Rust mpv code in this repo. The plugin owns the mpv lifecycle, prope
 ### Frontend (`src/`)
 
 - `main.tsx` — entry point. Reads `window.location.hash` at startup; renders `<Downloader />` when hash is `#downloader`, otherwise renders `<App />`. Also adds a `downloader-window` class to `<html>` in the downloader case — used to scope CSS that must not leak into the main window (see Gotchas).
-- `App.tsx` — root component; lays out the **left icon sidebar** + a `#video-panel` div (the slot mpv renders behind). Owns project save/load, hosts the rebindable-shortcut hook, opens the Downloader and ScrollPanelApp side windows.
+- `App.tsx` — root component; lays out the **collapsible left icon sidebar** + a `#video-panel` div (the slot mpv renders behind). Owns project save/load, hosts the rebindable-shortcut hook, opens the Downloader and ScrollPanelApp side windows.
 - `constants.ts` / `types.ts` / `utils.ts` — single source of truth for constants (timeline dims, scroll-step bounds, color palette), shared types (`Segment`, `Codec`, `Container`, `HwEncoder`, `HwSupport`, `VideoFormat`, `YtdlpProgress`, `YtdlpConfig`), and helpers (`clamp`, `newId`, `pickColor`, `expandFilename`, `formatTime`).
 - `hooks/useMpv.ts` — owns the libmpv plugin lifecycle:
   - `init()` once on mount with `vo: gpu-next`, `hwdec: auto-safe`, `keep-open: yes`, `force-window: yes`, `pause: yes`, `hr-seek: yes`. Idempotent — never calls `destroy()` (the plugin tears down on `WindowEvent::CloseRequested`).
@@ -57,9 +57,9 @@ There is no Rust mpv code in this repo. The plugin owns the mpv lifecycle, prope
   - ResizeObserves `#video-panel` and calls `setVideoMarginRatio({left, right, top, bottom})` so mpv only paints inside that rectangle.
   - Calls `command('loadfile', [path])` when `filePath` changes.
   - Returns `{ play, pause, seek, frameStep, frameBackStep, setMute }`.
-- `hooks/useAppState.ts` — single state hook holding segments, playhead, duration, fps, mute, file path, modal/error state, and persisted user settings (scroll-step values, HW encoder, scroll panel visibility). Persists settings to localStorage under `video-trimmer-settings`.
+- `hooks/useAppState.ts` — single state hook holding segments, playhead, duration, fps, mute, file path, modal/error state, and persisted user settings (scroll-step values, HW encoder, scroll panel visibility). Persists settings to localStorage under `video-trimmer-settings`. Owns the **3-deep undo/redo stacks** for segment edits (`Snapshot` type, `MAX_UNDO = 3`); drag edits go through `beginDrag()` / `endDrag()` so a whole drag becomes one history entry.
 - `hooks/useKeyboard.ts` — global keydown handler; reads state via refs to avoid re-registering on every render. Maps keys → actions via the table returned by `useShortcuts` (not hard-coded).
-- `hooks/useShortcuts.ts` — user-rebindable shortcut bindings for `playPause | frameBack | frameForward | setStart | setEnd | deleteSegment`. Defaults: Space, ←, →, I, O, Delete. Persisted to localStorage under **`video-trimmer-shortcuts`** (separate key from the main settings blob).
+- `hooks/useShortcuts.ts` — user-rebindable shortcut bindings for `playPause | frameBack | frameForward | setStart | setEnd | deleteSegment | undo | redo`. Defaults: Space, ←, →, I, O, Delete, Ctrl+Z, Ctrl+Shift+Z. Persisted to localStorage under **`video-trimmer-shortcuts`** (separate key from the main settings blob).
 - `hooks/useWheelSeek.ts` — **global** window-level wheel listener (non-passive). Wheel = step `framesPerScrollTick` frames using clip's real fps; Shift+wheel = step `secondsPerShiftScrollTick` seconds. Suppressed when modals are open or focus is on form controls. Mirrors `useKeyboard`'s ref-based pattern.
 - `hooks/useFileDrop.ts` — Tauri webview drag-drop, filtered by extension.
 - `components/PlaybackControls.tsx` — unified control bar: transport (play/pause/frame-step/mute), segment edit (set start/end, add/delete, Next ▸), and zoom slider.
@@ -75,7 +75,7 @@ There is no Rust mpv code in this repo. The plugin owns the mpv lifecycle, prope
 
 A second Tauri window (`label: "downloader"`) opened from the main **left sidebar** via `WebviewWindow`. Uses the same JS bundle via hash routing (see `main.tsx` above). The ScrollPanelApp window (`#scroll-panel` hash) follows the same pattern.
 
-- `Downloader.tsx` — full downloader UI: URL input, yt-dlp format list, download progress, "Load into Editor" (emits `load-video-file` event to main window), "Delete Temp" button.
+- `Downloader.tsx` — full downloader UI: URL input, yt-dlp format list, download progress, "Open Temp Folder" button (opens the temp dir in the OS file manager), "Delete Temp" button. An editable temp-dir field is persisted to `YtdlpState`.
 - `YtdlpPathModal.tsx` — inline modal for setting the path to `yt-dlp.exe`. Persisted via `save_ytdlp_path` Rust command.
 - `downloader.css` — downloader-specific styles. All rules that touch `html`/`body`/`#root` or share class names with App.css (e.g. `.modal`) **must be scoped to `.downloader-window`** to avoid overriding the main window's transparent background or modal colors (see Gotchas).
 

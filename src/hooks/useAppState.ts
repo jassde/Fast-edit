@@ -96,7 +96,7 @@ export type AppState = {
 // ── Undo / Redo ───────────────────────────────────────────────────────────────
 // A Snapshot is the unit stored on the undo/redo stacks. Intentionally narrow:
 // only segments + selection. Playhead / playback / modal / settings state are
-// deliberately excluded — see docs/adr/0001-segment-undo-snapshot-stack.md.
+// deliberately excluded so undo only affects segment edits.
 
 export type Snapshot = {
   segments:          Segment[]
@@ -216,7 +216,7 @@ export function useAppState(): [AppState, AppActions] {
   // ── Undo / Redo stacks ──────────────────────────────────────────────────
   // Kept as refs (not state) because the stacks themselves drive no UI;
   // the visible feedback is the segments mutation, which already triggers a
-  // re-render via setState. See docs/adr/0001-segment-undo-snapshot-stack.md.
+  // re-render via setState.
   const undoStackRef  = useRef<Snapshot[]>([])
   const redoStackRef  = useRef<Snapshot[]>([])
   // Drag snapshot held between beginDrag() and endDrag().
