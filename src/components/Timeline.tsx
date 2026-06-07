@@ -241,9 +241,10 @@ export function Timeline({
       const width     = isTiny ? 2 : realWidth
       const isSelected = seg.id === selectedSegmentId
 
-      // color-mix works with any CSS color (hex / oklch / rgb) — no longer
-      // depends on `seg.color` being a 6-digit hex string.
-      const bg = `color-mix(in oklch, ${seg.color} 28%, transparent)`
+      // Layered fill: a vivid color-mix base + a subtle top-light gradient for
+      // depth. Keeps timeline readable while making segments pop more than the
+      // previous flat 28% mix.
+      const bg = `linear-gradient(180deg, color-mix(in oklch, ${seg.color} 52%, transparent) 0%, color-mix(in oklch, ${seg.color} 34%, transparent) 100%)`
 
       return (
         <div

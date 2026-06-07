@@ -14,7 +14,7 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useWheelSeek } from "./hooks/useWheelSeek";
 import { HwSupport, ProjectFile } from "./types";
 
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, Film } from "lucide-react";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { Timeline } from "./components/Timeline";
 import { ExportModal } from "./components/ExportModal";
@@ -361,6 +361,9 @@ export default function App() {
       <div className="app-top">
         {/* ── Sidebar ── */}
         <div className={`sidebar${sidebarExpanded ? " expanded" : ""}`}>
+          <div className="sidebar-brand" aria-hidden="true" title="Video Trimmer">
+            <Clapperboard size={18} strokeWidth={2} />
+          </div>
           <button
             className="sidebar-toggle"
             onClick={toggleSidebar}
@@ -544,19 +547,24 @@ export default function App() {
             )}
             {!state.filePath && !state.mpvError && (
               <div className="video-banner video-banner--empty">
+                <div className="empty-icon" aria-hidden="true">
+                  <Film strokeWidth={1.5} />
+                </div>
                 <span>Drop a video file here, or use Open File</span>
-                <span className="hint">Supported: MP4, WebM, MKV, MOV</span>
+                <span className="hint">MP4 · WebM · MKV · MOV</span>
                 <div className="onboarding-steps">
                   <div className="onboarding-step">
                     <span className="onboarding-step-num">1</span>
                     <span className="onboarding-step-text">Open a video</span>
                   </div>
+                  <div className="onboarding-step-connector" aria-hidden="true" />
                   <div className="onboarding-step">
                     <span className="onboarding-step-num">2</span>
                     <span className="onboarding-step-text">
-                      Mark segments with <kbd>I</kbd> / <kbd>O</kbd>
+                      Mark with <kbd>I</kbd> / <kbd>O</kbd>
                     </span>
                   </div>
+                  <div className="onboarding-step-connector" aria-hidden="true" />
                   <div className="onboarding-step">
                     <span className="onboarding-step-num">3</span>
                     <span className="onboarding-step-text">Export</span>
