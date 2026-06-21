@@ -164,11 +164,7 @@ pub async fn install_mangofetch(
             .map_err(|e| format!("Failed to run `cargo install mangofetch`: {e}"))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let snippet = if stderr.len() > 800 {
-                stderr[stderr.len() - 800..].to_string()
-            } else {
-                stderr.to_string()
-            };
+            let snippet = tail_chars(&stderr, 800);
             return Err(format!("cargo install mangofetch failed:\n{}", snippet.trim()));
         }
         Ok(())
@@ -292,9 +288,11 @@ pub async fn download_video(
         if audio_only {
             cmd.arg("-a");
         }
-        // `Best` means "let mangofetch pick" — omit `-q` entirely. Any other
-        // value is passed through (e.g. "1080p", "720p").
-        if quality != "best" {
+        // `best` means "let mangofetch pick" — omit `-q` entirely. `audio` is
+        // not a valid quality value; the audio-only mode is already selected
+        // via `-a` above, so skip `-q` for it too. Any other value is passed
+        // through (e.g. "1080p", "720p").
+        if quality != "best" && quality != "audio" && !audio_only {
             cmd.arg("-q").arg(&quality);
         }
         cmd.arg("--").arg(&url)
@@ -337,11 +335,7 @@ pub async fn download_video(
         if !output.status.success() {
             let stderr_text = String::from_utf8_lossy(&output.stderr);
             let cleaned = strip_ansi(&stderr_text);
-            let snippet = if cleaned.len() > 800 {
-                cleaned[cleaned.len() - 800..].to_string()
-            } else {
-                cleaned
-            };
+            let snippet = tail_chars(&cleaned, 800);
             return Err(format!(
                 "mangofetch download failed.\n\nmangofetch output:\n{}",
                 snippet.trim()
@@ -409,22 +403,34 @@ pub fn clear_temp_dir(state: State<'_, Mutex<MangofetchState>>) -> Result<(), St
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/// Take the last `max_chars` characters of `s` (char-safe; never splits a
+/// multi-byte UTF-8 sequence). Used to truncate long stderr snippets for the UI.
+fn tail_chars(s: &str, max_chars: usize) -> String {
+    let total = s.chars().count();
+    if total <= max_chars {
+        return s.to_string();
+    }
+    s.chars().skip(total - max_chars).collect()
+}
+
 /// Strip ANSI CSI sequences (colour, cursor, etc.) so log lines parse cleanly.
+/// Iterates over chars (not raw bytes) so multi-byte UTF-8 sequences in the
+/// surrounding text are preserved instead of being truncated to garbage.
 fn strip_ansi(s: &str) -> String {
-    let bytes = s.as_bytes();
     let mut out = String::with_capacity(s.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == 0x1b && i + 1 < bytes.len() && bytes[i + 1] == b'[' {
-            // skip until a final byte in 0x40..=0x7E
-            i += 2;
-            while i < bytes.len() && !(0x40..=0x7E).contains(&bytes[i]) {
-                i += 1;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' && chars.peek() == Some(&'[') {
+            chars.next(); // consume '['
+            // Skip parameter/intermediate bytes until a final byte in 0x40..=0x7E.
+            while let Some(&nc) = chars.peek() {
+                chars.next();
+                if (0x40u32..=0x7E).contains(&(nc as u32)) {
+                    break;
+                }
             }
-            if i < bytes.len() { i += 1; }
         } else {
-            out.push(bytes[i] as char);
-            i += 1;
+            out.push(c);
         }
     }
     out
@@ -459,6 +465,33 @@ mod tests {
     #[test]
     fn strip_ansi_leaves_plain_text_alone() {
         assert_eq!(strip_ansi("plain text"), "plain text");
+    }
+
+    #[test]
+    fn strip_ansi_preserves_multibyte_utf8() {
+        // em-dash (—) and accented chars must survive intact.
+        let s = "\x1b[31merror\x1b[0m: café — naïve";
+        assert_eq!(strip_ansi(s), "error: café — naïve");
+    }
+
+    #[test]
+    fn tail_chars_under_limit_returns_whole_string() {
+        assert_eq!(tail_chars("hello", 10), "hello");
+    }
+
+    #[test]
+    fn tail_chars_over_limit_keeps_last_n_chars() {
+        assert_eq!(tail_chars("abcdefghij", 4), "ghij");
+    }
+
+    #[test]
+    fn tail_chars_never_splits_multibyte() {
+        // 5 chars, each 2 bytes in UTF-8 ("é" = 0xC3 0xA9). Taking last 3
+        // characters should yield 3 chars / 6 bytes, never panicking.
+        let s = "ééééé";
+        let out = tail_chars(s, 3);
+        assert_eq!(out.chars().count(), 3);
+        assert_eq!(out, "ééé");
     }
 
     #[test]

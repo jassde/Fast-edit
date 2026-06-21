@@ -112,7 +112,7 @@ export type Snapshot = {
   selectedSegmentId: string | null
 }
 
-const MAX_UNDO = 3
+const MAX_UNDO = 50
 
 function snapshotsEqual(a: Snapshot, b: Snapshot): boolean {
   if (a.selectedSegmentId !== b.selectedSegmentId) return false
@@ -200,6 +200,39 @@ const INITIAL_STATE: AppState = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Validate segments loaded from a .vtproj.json file. The file is user-editable
+ * so its contents are not trusted: drop entries with non-finite or non-positive
+ * spans, then walk in start order and drop anything overlapping a kept segment.
+ * This keeps the rest of the app's "no overlap, finite numbers" invariants safe.
+ */
+function sanitizeLoadedSegments(raw: unknown): Segment[] {
+  if (!Array.isArray(raw)) return []
+  const valid: Segment[] = []
+  for (const s of raw) {
+    if (!s || typeof s !== 'object') continue
+    const seg = s as Partial<Segment>
+    const start = Number(seg.start)
+    const end   = Number(seg.end)
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue
+    if (start < 0 || end <= start) continue
+    valid.push({
+      id:    typeof seg.id === 'string' && seg.id ? seg.id : newId(),
+      start,
+      end,
+      color: typeof seg.color === 'string' && seg.color ? seg.color : pickColor(valid.map(v => v.color)),
+    })
+  }
+  valid.sort((a, b) => a.start - b.start)
+  const kept: Segment[] = []
+  for (const seg of valid) {
+    const last = kept[kept.length - 1]
+    if (last && seg.start < last.end) continue   // overlaps previous → drop
+    kept.push(seg)
+  }
+  return kept
+}
+
 /** Sort segments by start time and return them alongside their sorted index for a given id. */
 function findSorted(
   segments: Segment[],
@@ -209,6 +242,32 @@ function findSorted(
   const idx    = sorted.findIndex(s => s.id === id)
   if (idx === -1) return null
   return { sorted, idx, seg: sorted[idx] }
+}
+
+/**
+ * Linear-scan neighbor lookup for a segment by id. Returns the segment and the
+ * tightest left/right bounds set by the closest non-overlapping neighbors.
+ * Avoids the per-call sort + clone that `findSorted` does — used on the drag
+ * hot path (setSegmentStart / setSegmentEnd fire on every mousemove).
+ */
+function findNeighbors(
+  segments: Segment[],
+  id: string,
+  duration: number,
+): { seg: Segment; leftBound: number; rightBound: number } | null {
+  let seg: Segment | null = null
+  for (const s of segments) {
+    if (s.id === id) { seg = s; break }
+  }
+  if (!seg) return null
+  let leftBound  = 0
+  let rightBound = duration
+  for (const s of segments) {
+    if (s.id === id) continue
+    if (s.end <= seg.start && s.end > leftBound) leftBound = s.end
+    if (s.start >= seg.end && s.start < rightBound) rightBound = s.start
+  }
+  return { seg, leftBound, rightBound }
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -303,10 +362,9 @@ export function useAppState(): [AppState, AppActions] {
 
   const setSegmentStart = useCallback((id: string, start: number) => {
     setState(s => {
-      const found = findSorted(s.segments, id)
+      const found = findNeighbors(s.segments, id, s.duration)
       if (!found) return s
-      const { sorted, idx, seg } = found
-      const leftBound    = idx > 0 ? sorted[idx - 1].end : 0
+      const { seg, leftBound } = found
       const clampedStart = clamp(start, leftBound, seg.end - MIN_FRAME_GAP_S)
       return {
         ...s,
@@ -319,10 +377,9 @@ export function useAppState(): [AppState, AppActions] {
 
   const setSegmentEnd = useCallback((id: string, end: number) => {
     setState(s => {
-      const found = findSorted(s.segments, id)
+      const found = findNeighbors(s.segments, id, s.duration)
       if (!found) return s
-      const { sorted, idx, seg } = found
-      const rightBound = idx < sorted.length - 1 ? sorted[idx + 1].start : s.duration
+      const { seg, rightBound } = found
       const clampedEnd = clamp(end, seg.start + MIN_FRAME_GAP_S, rightBound)
       return {
         ...s,
@@ -410,12 +467,19 @@ export function useAppState(): [AppState, AppActions] {
     undoStackRef.current.length = 0
     redoStackRef.current.length = 0
     dragSnapRef.current = null
+    // .vtproj.json is user-editable — don't trust the file. Drop segments with
+    // non-finite or inverted times, then sort + walk to drop overlaps that
+    // would break the timeline's "no overlap" invariant.
+    const cleanSegments = sanitizeLoadedSegments(p.segments)
+    const playheadPosition = Number.isFinite(p.playheadPosition) && p.playheadPosition >= 0
+      ? p.playheadPosition
+      : 0
     setState(s => ({
       ...s,
       filePath: p.filePath,
-      segments: p.segments,
+      segments: cleanSegments,
       selectedSegmentId: null,
-      playheadPosition: p.playheadPosition,
+      playheadPosition,
       duration: 0,
       fps: DEFAULT_FPS,
       isPlaying: false,
