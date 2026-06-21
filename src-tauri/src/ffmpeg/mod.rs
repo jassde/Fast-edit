@@ -50,6 +50,23 @@ pub fn find_ffmpeg(app_dir: &Path) -> Result<PathBuf, String> {
     Err("ffmpeg not found. See README for setup instructions.".to_string())
 }
 
+/// Remove Windows' `\\?\` verbatim prefix. Returns the input unchanged on
+/// non-Windows platforms or when no prefix is present.
+fn strip_unc_prefix(p: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let s = p.to_string_lossy();
+        if let Some(rest) = s.strip_prefix(r"\\?\") {
+            // Don't strip the longer UNC form `\\?\UNC\…` — that one needs the
+            // prefix to remain a valid network path.
+            if !rest.starts_with("UNC\\") {
+                return PathBuf::from(rest.to_string());
+            }
+        }
+    }
+    p.to_path_buf()
+}
+
 fn run_export(
     ffmpeg_path: &Path,
     hw_support: &HwSupport,
@@ -94,9 +111,12 @@ fn run_export(
     }
 
     // Canonicalise and verify the output directory before doing any work.
-    let output_dir = Path::new(&params.output_dir)
+    // Strip Windows' \\?\ verbatim prefix that `canonicalize` adds — some ffmpeg
+    // builds (and the concat demuxer) choke on UNC-style paths.
+    let canon = Path::new(&params.output_dir)
         .canonicalize()
         .map_err(|e| format!("Output directory invalid: {e}"))?;
+    let output_dir = strip_unc_prefix(&canon);
     if !output_dir.is_dir() {
         return Err(format!(
             "Output path is not a directory: {}",
