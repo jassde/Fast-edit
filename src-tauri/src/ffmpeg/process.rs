@@ -84,6 +84,13 @@ pub(crate) fn run_ffmpeg_with_progress(
     let mut reader = BufReader::new(stderr);
     let mut line_buf: Vec<u8> = Vec::with_capacity(256);
 
+    // Rolling buffer of the last N non-progress stderr lines, so that on
+    // failure we can surface ffmpeg's actual error message to the UI instead
+    // of just the opaque exit code.
+    const TAIL_LINES: usize = 20;
+    let mut tail: std::collections::VecDeque<String> =
+        std::collections::VecDeque::with_capacity(TAIL_LINES);
+
     let mut chunk = [0u8; 4096];
     loop {
         match reader.read(&mut chunk) {
@@ -105,6 +112,14 @@ pub(crate) fn run_ffmpeg_with_progress(
                                     "export-progress",
                                     ExportProgressPayload { percent: overall },
                                 );
+                            } else {
+                                let trimmed = line.trim();
+                                if !trimmed.is_empty() {
+                                    if tail.len() == TAIL_LINES {
+                                        tail.pop_front();
+                                    }
+                                    tail.push_back(trimmed.to_string());
+                                }
                             }
                             line_buf.clear();
                         }
@@ -119,7 +134,12 @@ pub(crate) fn run_ffmpeg_with_progress(
 
     let status = child.wait().map_err(|e| format!("ffmpeg wait failed: {e}"))?;
     if !status.success() {
-        return Err(format!("ffmpeg exited with status {status}"));
+        let detail = if tail.is_empty() {
+            "(no stderr output captured)".to_string()
+        } else {
+            tail.into_iter().collect::<Vec<_>>().join("\n")
+        };
+        return Err(format!("ffmpeg exited with status {status}\n{detail}"));
     }
 
     Ok(())
