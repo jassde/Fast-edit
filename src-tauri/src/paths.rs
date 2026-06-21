@@ -15,10 +15,9 @@ pub struct AppPaths {
 }
 
 impl AppPaths {
-    pub fn cookies_dir(&self) -> PathBuf { self.fast_edit_root.join("Cookies") }
-    pub fn saves_dir(&self)   -> PathBuf { self.fast_edit_root.join("saves") }
-    // Temp dir lives on YtdlpState directly (mirrored at startup and on root
-    // change) so download_video can read it under a single mutex lock.
+    pub fn saves_dir(&self) -> PathBuf { self.fast_edit_root.join("saves") }
+    // Temp dir lives on MangofetchState directly (mirrored at startup and on
+    // root change) so download_video can read it under a single mutex lock.
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -82,7 +81,7 @@ pub fn get_fast_edit_root(state: State<'_, Mutex<AppPaths>>) -> String {
 pub fn set_fast_edit_root(
     new_path: String,
     paths_state: State<'_, Mutex<AppPaths>>,
-    ytdlp_state: State<'_, Mutex<crate::ytdlp::YtdlpState>>,
+    mangofetch_state: State<'_, Mutex<crate::mangofetch::MangofetchState>>,
     app: AppHandle,
 ) -> Result<String, String> {
     let trimmed = new_path.trim();
@@ -132,7 +131,7 @@ pub fn set_fast_edit_root(
         guard.fast_edit_root = target.clone();
     }
     {
-        let mut guard = ytdlp_state.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = mangofetch_state.lock().unwrap_or_else(|e| e.into_inner());
         guard.temp_dir = target.join("Temp video files");
     }
 

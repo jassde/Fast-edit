@@ -1,7 +1,7 @@
 mod ffmpeg;
+mod mangofetch;
 mod paths;
 mod project;
-mod ytdlp;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -29,16 +29,16 @@ pub fn run() {
                 guard.hw_support  = hw_support;
             }
 
-            // Initialise the configurable Fast-edit root FIRST — ytdlp's temp
-            // dir derives from it.
+            // Initialise the configurable Fast-edit root FIRST — mangofetch's
+            // temp dir derives from it.
             let app_paths = paths::init_state(&app.handle());
             let root = app_paths.fast_edit_root.clone();
             app.manage(Mutex::new(app_paths));
 
-            // Initialise yt-dlp state: loads persisted exe path and uses the
-            // Fast-edit root for the Temp dir.
-            let ytdlp_state = ytdlp::init_state(&app.handle(), &root);
-            app.manage(Mutex::new(ytdlp_state));
+            // Initialise mangofetch state: detect the binary on PATH (or in
+            // ~/.cargo/bin) and use the Fast-edit root for the Temp dir.
+            let mangofetch_state = mangofetch::init_state(&root);
+            app.manage(Mutex::new(mangofetch_state));
 
             Ok(())
         })
@@ -46,14 +46,12 @@ pub fn run() {
             ffmpeg::export_segments,
             ffmpeg::pick_output_dir,
             ffmpeg::get_hw_support,
-            ytdlp::get_ytdlp_config,
-            ytdlp::save_ytdlp_path,
-            ytdlp::save_cookie_settings,
-            ytdlp::fetch_formats,
-            ytdlp::download_video,
-            ytdlp::get_temp_dir,
-            ytdlp::clear_temp_dir,
-            ytdlp::default_cookies_dir,
+            mangofetch::get_mangofetch_config,
+            mangofetch::install_mangofetch,
+            mangofetch::update_mangofetch,
+            mangofetch::download_video,
+            mangofetch::get_temp_dir,
+            mangofetch::clear_temp_dir,
             project::default_save_dir,
             project::save_project,
             project::load_project,

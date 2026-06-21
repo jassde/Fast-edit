@@ -2,109 +2,146 @@ import './downloader.css'
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { open } from '@tauri-apps/plugin-dialog'
 import { openPath } from '@tauri-apps/plugin-opener'
-import YtdlpPathModal from './YtdlpPathModal'
-import type { VideoFormat, YtdlpProgress, YtdlpConfig, CookieSource } from '../types'
+import type {
+  MangofetchConfig,
+  MangofetchInstall,
+  MangofetchProgress,
+  MangofetchQuality,
+  MangofetchUpdate,
+} from '../types'
 
-type Phase = 'idle' | 'fetching' | 'ready' | 'downloading' | 'done' | 'error'
+type Phase = 'idle' | 'downloading' | 'done' | 'error'
+
+const QUALITIES: { value: MangofetchQuality; label: string }[] = [
+  { value: 'best',  label: 'Best available' },
+  { value: '1080p', label: '1080p' },
+  { value: '720p',  label: '720p' },
+  { value: '480p',  label: '480p' },
+  { value: '360p',  label: '360p' },
+  { value: 'audio', label: 'Audio only (best quality)' },
+]
+
+const PHASE_LABEL: Record<MangofetchProgress['phase'], string> = {
+  fetching:    'Fetching media info…',
+  downloading: 'Downloading…',
+  muxing:      'Finalizing…',
+  done:        'Complete',
+}
 
 export default function Downloader() {
   const [url, setUrl]                     = useState('')
-  const [formats, setFormats]             = useState<VideoFormat[]>([])
-  const [selectedFormat, setSelectedFormat] = useState<VideoFormat | null>(null)
+  const [quality, setQuality]             = useState<MangofetchQuality>('best')
   const [phase, setPhase]                 = useState<Phase>('idle')
-  const [progress, setProgress]           = useState<YtdlpProgress>({ percent: 0, speed: '', eta: '' })
+  const [progressPhase, setProgressPhase] = useState<MangofetchProgress['phase']>('fetching')
   const [errorMsg, setErrorMsg]           = useState('')
   const [tempDir, setTempDir]             = useState('')
-  const [ytdlpPath, setYtdlpPath]         = useState('')
-  const [showPathModal, setShowPathModal] = useState(false)
+  const [installed, setInstalled]         = useState<boolean | null>(null)
+  const [installState, setInstallState]   = useState<'idle' | 'running' | 'done' | 'cargoMissing' | 'error'>('idle')
+  const [installError, setInstallError]   = useState('')
+  const [updateState, setUpdateState]     = useState<'idle' | 'running' | 'done' | 'error'>('idle')
+  const [updateError, setUpdateError]     = useState('')
   const [clearingTemp, setClearingTemp]   = useState(false)
-  const [cookieSource, setCookieSource]   = useState<CookieSource>({ type: 'none' })
-  const [savingCookies, setSavingCookies] = useState(false)
 
+  // Load config on mount.
   useEffect(() => {
-    invoke<YtdlpConfig>('get_ytdlp_config').then(cfg => {
-      setYtdlpPath(cfg.ytdlpPath)
+    invoke<MangofetchConfig>('get_mangofetch_config').then(cfg => {
+      setInstalled(cfg.installed)
       setTempDir(cfg.tempDir)
-      setCookieSource(cfg.cookieSource)
     })
   }, [])
 
+  // Listen for download progress phase changes.
   useEffect(() => {
     let aborted = false
     let unlisten: (() => void) | null = null
-    listen<YtdlpProgress>('ytdlp-progress', e => setProgress(e.payload))
-      .then(ul => {
-        if (aborted) ul()
-        else unlisten = ul
-      })
+    listen<MangofetchProgress>('mangofetch-progress', e => setProgressPhase(e.payload.phase))
+      .then(ul => { if (aborted) ul(); else unlisten = ul })
       .catch(console.error)
-    return () => {
-      aborted = true
-      unlisten?.()
-    }
+    return () => { aborted = true; unlisten?.() }
   }, [])
 
-  const handleFetch = useCallback(async () => {
-    if (!url.trim()) return
-    setPhase('fetching')
-    setErrorMsg('')
-    setFormats([])
-    setSelectedFormat(null)
-    try {
-      const result = await invoke<VideoFormat[]>('fetch_formats', { url })
-      setFormats(result)
-      setSelectedFormat(result[0] ?? null)
-      setPhase('ready')
-    } catch (e) {
-      setErrorMsg(String(e))
-      setPhase('error')
+  // Listen for background-update events.
+  useEffect(() => {
+    let aborted = false
+    let unlisten: (() => void) | null = null
+    listen<MangofetchUpdate>('mangofetch-update', e => {
+      setUpdateState(e.payload.phase)
+      if (e.payload.phase === 'error') setUpdateError(e.payload.message)
+      else setUpdateError('')
+    })
+      .then(ul => { if (aborted) ul(); else unlisten = ul })
+      .catch(console.error)
+    return () => { aborted = true; unlisten?.() }
+  }, [])
+
+  // Listen for install events.
+  useEffect(() => {
+    let aborted = false
+    let unlisten: (() => void) | null = null
+    listen<MangofetchInstall>('mangofetch-install', e => {
+      setInstallState(e.payload.phase)
+      if (e.payload.phase === 'error') setInstallError(e.payload.message)
+      else if (e.payload.phase !== 'cargoMissing') setInstallError('')
+      // When install reports done, refresh config so `installed` flips to true
+      // and the `update` effect below fires.
+      if (e.payload.phase === 'done') {
+        invoke<MangofetchConfig>('get_mangofetch_config').then(cfg => {
+          setInstalled(cfg.installed)
+          setTempDir(cfg.tempDir)
+        })
+      }
+    })
+      .then(ul => { if (aborted) ul(); else unlisten = ul })
+      .catch(console.error)
+    return () => { aborted = true; unlisten?.() }
+  }, [])
+
+  // Auto-install if missing. The Rust side gates on cargo presence and emits
+  // `cargoMissing` if rustup isn't there — in which case we don't retry.
+  useEffect(() => {
+    if (installed === false && installState === 'idle') {
+      invoke('install_mangofetch').catch(e => {
+        // Phase events already update state; ignore the rejection unless the
+        // event listener missed it (defensive — shouldn't happen).
+        const msg = String(e)
+        if (msg.includes('cargo) is not installed')) {
+          setInstallState('cargoMissing')
+        } else {
+          setInstallState('error')
+          setInstallError(msg)
+        }
+      })
     }
-  }, [url])
+  }, [installed, installState])
+
+  // Fire `mangofetch update` once installed (background, non-blocking).
+  useEffect(() => {
+    if (installed === true) {
+      invoke('update_mangofetch').catch(e => {
+        setUpdateState('error')
+        setUpdateError(String(e))
+      })
+    }
+  }, [installed])
 
   const handleDownload = useCallback(async () => {
-    if (!selectedFormat) return
+    if (!url.trim()) return
     setPhase('downloading')
-    setProgress({ percent: 0, speed: '', eta: '' })
+    setProgressPhase('fetching')
     setErrorMsg('')
     try {
       await invoke<string>('download_video', {
         url,
-        formatSelector: selectedFormat.ytdlpSelector,
+        quality,
+        audioOnly: quality === 'audio',
       })
       setPhase('done')
     } catch (e) {
       setErrorMsg(String(e))
       setPhase('error')
     }
-  }, [selectedFormat, url])
-
-  const handleCookieSave = useCallback(async (source: CookieSource) => {
-    setSavingCookies(true)
-    try {
-      await invoke('save_cookie_settings', { cookieSource: source })
-      setCookieSource(source)
-      setErrorMsg('')
-    } catch (e) {
-      setErrorMsg(String(e))
-    } finally {
-      setSavingCookies(false)
-    }
-  }, [])
-
-  const browseCookieFile = useCallback(async () => {
-    let defaultPath: string | undefined
-    try { defaultPath = await invoke<string>('default_cookies_dir') } catch { /* ignore */ }
-    const selected = await open({
-      multiple: false,
-      defaultPath,
-      filters: [{ name: 'Cookie file', extensions: ['txt'] }],
-    })
-    if (typeof selected === 'string') {
-      await handleCookieSave({ type: 'file', path: selected })
-    }
-  }, [handleCookieSave])
+  }, [url, quality])
 
   const handleOpenTempFolder = useCallback(async () => {
     if (!tempDir) return
@@ -117,8 +154,6 @@ export default function Downloader() {
   }, [tempDir])
 
   const handleClearTemp = useCallback(async () => {
-    // Confirm before deleting — destructive and irreversible. If the user just
-    // downloaded a file and hasn't loaded it into the editor yet, this nukes it.
     const ok = window.confirm(
       'Delete all files in the Temp folder?\n\nThis cannot be undone.'
     )
@@ -136,230 +171,131 @@ export default function Downloader() {
 
   const isDownloading = phase === 'downloading'
   const isDone        = phase === 'done'
-  const isFetching    = phase === 'fetching'
-  const isYtdlpMissing = !ytdlpPath
+  const isMissing     = installed === false
+  const isInstalling  = installState === 'running'
+  const formLocked    = isDownloading || isMissing || isInstalling
 
-  const downloadDisabled = !selectedFormat || isDownloading || !url.trim() || isYtdlpMissing
-
+  const downloadDisabled = formLocked || !url.trim()
   let downloadTitle = ''
-  if (isYtdlpMissing) downloadTitle = 'yt-dlp path not configured — click "yt-dlp Path" button above'
-  else if (!selectedFormat) downloadTitle = 'Select a video format first'
-  else if (!url.trim()) downloadTitle = 'Enter a video URL'
-  else if (isDownloading) downloadTitle = 'Download in progress'
-
-  const pathBtnClass = isYtdlpMissing ? 'btn btn-danger' : 'btn btn-chrome'
+  if (isInstalling)         downloadTitle = 'Installing mangofetch…'
+  else if (isMissing)       downloadTitle = 'mangofetch is not installed'
+  else if (!url.trim())     downloadTitle = 'Enter a video URL'
+  else if (isDownloading)   downloadTitle = 'Download in progress'
 
   return (
     <div className="dl-window">
 
       {/* Title bar */}
       <div className="top-bar">
-        <span className="app-title">🎬 Video Downloader</span>
-        <button
-          className={pathBtnClass}
-          style={{ marginLeft: 'auto' }}
-          onClick={() => setShowPathModal(true)}
-          title={ytdlpPath ? `yt-dlp: ${ytdlpPath}` : '⚠️ yt-dlp is missing — set path to enable downloads'}
-        >
-          yt-dlp Path{isYtdlpMissing ? ' ⚠️' : ''}
-        </button>
+        <span className="app-title">🥭 Video Downloader</span>
+        {isInstalling && (
+          <span className="dl-update-chip" style={{ marginLeft: 'auto' }}>
+            Installing mangofetch…
+          </span>
+        )}
+        {!isInstalling && updateState === 'running' && (
+          <span className="dl-update-chip" style={{ marginLeft: 'auto' }}>
+            Updating tools…
+          </span>
+        )}
+        {!isInstalling && updateState === 'done' && (
+          <span className="dl-update-chip dl-update-chip-ok" style={{ marginLeft: 'auto' }}>
+            Tools up to date
+          </span>
+        )}
+        {!isInstalling && updateState === 'error' && (
+          <span
+            className="dl-update-chip dl-update-chip-err"
+            style={{ marginLeft: 'auto' }}
+            title={updateError}
+          >
+            Update failed
+          </span>
+        )}
       </div>
 
       {/* Body */}
       <div className="dl-body">
 
+        {/* Install status — shown while cargo install is running, on errors, and
+            when the Rust toolchain itself is missing. */}
+        {isInstalling && (
+          <div className="warning-banner">
+            ⏳ Installing <strong>mangofetch</strong> via <code>cargo install</code>.
+            First-time setup compiles from source and can take several minutes.
+          </div>
+        )}
+        {installState === 'cargoMissing' && (
+          <div className="warning-banner">
+            ⚠️ <strong>Rust (cargo) is not installed.</strong>{' '}
+            Install it from{' '}
+            <a
+              href="https://rustup.rs/"
+              onClick={e => { e.preventDefault(); openPath('https://rustup.rs/').catch(() => {}) }}
+            >
+              rustup.rs
+            </a>
+            , then restart the app — mangofetch will be installed automatically.
+          </div>
+        )}
+        {installState === 'error' && (
+          <div className="warning-banner">
+            ❌ Could not install mangofetch.{' '}
+            <button
+              className="btn btn-link"
+              onClick={() => { setInstallState('idle'); /* triggers re-install effect */ }}
+            >
+              Try again
+            </button>
+            {installError && <div className="modal-error" style={{ marginTop: 6 }}>{installError}</div>}
+          </div>
+        )}
+
         {/* URL field */}
         <div className="modal-field">
           <span className="modal-label">Video URL</span>
-          <div className="dl-url-row">
-            <input
-              className="modal-input"
-              type="url"
-              placeholder="https://www.youtube.com/watch?v=…"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleFetch() }}
-              disabled={isDownloading}
-            />
-            <button
-              className="btn"
-              onClick={handleFetch}
-              disabled={!url.trim() || isFetching || isDownloading}
-            >
-              {isFetching ? 'Fetching…' : 'Fetch formats'}
-            </button>
-          </div>
+          <input
+            className="modal-input"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=…"
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !downloadDisabled) handleDownload() }}
+            disabled={formLocked}
+          />
         </div>
 
-        {/* Cookie source */}
+        {/* Quality picker */}
         <div className="modal-field">
-          <span className="modal-label">Cookie source</span>
-          <div className="dl-cookie-options">
-            <label className="dl-cookie-radio">
-              <input
-                type="radio" name="cookie-source"
-                checked={cookieSource.type === 'none'}
-                onChange={() => handleCookieSave({ type: 'none' })}
-                disabled={isDownloading}
-              />
-              None
-            </label>
-
-            <label className="dl-cookie-radio">
-              <input
-                type="radio" name="cookie-source"
-                checked={cookieSource.type === 'browser'}
-                onChange={() => handleCookieSave({ type: 'browser', browser: 'chrome', profile: '' })}
-                disabled={isDownloading}
-              />
-              Browser
-            </label>
-            {cookieSource.type === 'browser' && (
-              <div className="dl-cookie-browser-row">
-                <select
-                  className="dl-cookie-select"
-                  value={cookieSource.browser}
-                  onChange={e => handleCookieSave({ type: 'browser', browser: e.target.value, profile: cookieSource.profile })}
-                  disabled={isDownloading}
-                >
-                  <option value="chrome">Chrome</option>
-                  <option value="firefox">Firefox</option>
-                  <option value="edge">Edge</option>
-                  <option value="brave">Brave</option>
-                  <option value="opera">Opera</option>
-                  <option value="chromium">Chromium</option>
-                </select>
-                <input
-                  className="modal-input dl-cookie-profile"
-                  type="text"
-                  placeholder="Profile name (optional)"
-                  value={cookieSource.profile}
-                  onChange={e => {
-                    if (cookieSource.type === 'browser')
-                      setCookieSource({ ...cookieSource, profile: e.target.value })
-                  }}
-                  onBlur={() => {
-                    if (cookieSource.type === 'browser') handleCookieSave(cookieSource)
-                  }}
-                  disabled={isDownloading}
-                />
-              </div>
-            )}
-
-            <label className="dl-cookie-radio">
-              <input
-                type="radio" name="cookie-source"
-                checked={cookieSource.type === 'file'}
-                onChange={() => handleCookieSave({ type: 'file', path: '' })}
-                disabled={isDownloading}
-              />
-              Cookie file
-            </label>
-            {cookieSource.type === 'file' && (
-              <div className="dl-cookie-file-row">
-                <input
-                  className="modal-input" type="text"
-                  value={cookieSource.path}
-                  placeholder="C:\path\to\cookies.txt"
-                  onChange={e => setCookieSource({ type: 'file', path: e.target.value })}
-                  onBlur={() => { if (cookieSource.type === 'file') handleCookieSave(cookieSource) }}
-                  disabled={isDownloading}
-                />
-                <button className="btn" onClick={browseCookieFile} disabled={isDownloading}>
-                  Browse…
-                </button>
-              </div>
-            )}
-          </div>
-          {savingCookies && <span className="dl-cookie-saving">Saving…</span>}
+          <span className="modal-label">Quality</span>
+          <select
+            className="modal-input"
+            value={quality}
+            onChange={e => setQuality(e.target.value as MangofetchQuality)}
+            disabled={formLocked}
+          >
+            {QUALITIES.map(q => (
+              <option key={q.value} value={q.value}>{q.label}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Missing yt-dlp warning banner */}
-        {isYtdlpMissing && phase !== 'downloading' && (
-          <div className="warning-banner">
-            ⚠️ yt-dlp is not configured. Click the <strong>“yt-dlp Path”</strong> button above to select the executable.
-          </div>
-        )}
-
-        {/* Format picker table */}
-        {formats.length > 0 && (
-          <div className="modal-field">
-            <span className="modal-label">Available formats</span>
-            <div className="dl-format-table-wrap">
-              <table className="dl-format-table">
-                <thead>
-                  <tr>
-                    <th className="dl-fmt-check"></th>
-                    <th>Resolution</th>
-                    <th>FPS</th>
-                    <th>Codec</th>
-                    <th>Size</th>
-                    <th>Ext</th>
-                    <th>DR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formats.map(f => {
-                    const isSelected = selectedFormat?.formatId === f.formatId
-                    const isSpecial  = !f.resolution  // Best available / Audio only rows
-                    return (
-                      <tr
-                        key={f.formatId}
-                        className={`dl-fmt-row${isSelected ? ' is-selected' : ''}${isDownloading ? ' is-disabled' : ''}`}
-                        onClick={() => { if (!isDownloading) setSelectedFormat(f) }}
-                        title={f.label}
-                      >
-                        <td className="dl-fmt-check">{isSelected ? '✓' : ''}</td>
-                        {isSpecial ? (
-                          <td className="dl-fmt-special" colSpan={6}>{f.label}</td>
-                        ) : (
-                          <>
-                            <td>{f.resolution}</td>
-                            <td>{f.fps}</td>
-                            <td>{f.codec}</td>
-                            <td className="dl-fmt-size">{f.filesize}</td>
-                            <td className="dl-fmt-muted">{f.ext}</td>
-                            <td className="dl-fmt-muted">{f.dynamicRange !== 'SDR' ? f.dynamicRange : ''}</td>
-                          </>
-                        )}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Download progress */}
+        {/* Download progress — indeterminate; mangofetch CLI doesn't expose
+            per-chunk percent so we show a striped bar + phase label. */}
         {isDownloading && (
           <div className="modal-field">
             <div className="progress-bar-track">
-              <div className="progress-bar-fill" style={{ width: `${progress.percent}%` }} />
+              <div className="progress-bar-fill progress-bar-indeterminate" />
             </div>
             <div className="dl-progress-meta">
-              <span>📥 Downloading…</span>
-              <span>
-                {progress.percent.toFixed(1)}%
-                {progress.speed && ` · ${progress.speed}`}
-                {progress.eta   && ` · ETA ${progress.eta}`}
-              </span>
+              <span>📥 {PHASE_LABEL[progressPhase]}</span>
             </div>
           </div>
         )}
 
-        {/* Done state */}
-        {isDone && (
-          <div className="dl-done">
-            ✅ Download complete.
-          </div>
-        )}
+        {isDone && <div className="dl-done">✅ Download complete.</div>}
 
-        {/* Error message — shown whenever set, not gated on phase, so settings
-            save failures (temp dir, cookies) surface to the user too. */}
-        {errorMsg && (
-          <div className="modal-error">{errorMsg}</div>
-        )}
+        {errorMsg && <div className="modal-error">{errorMsg}</div>}
 
       </div>
 
@@ -393,16 +329,7 @@ export default function Downloader() {
             {clearingTemp ? 'Clearing…' : '🗑 Delete Temp'}
           </button>
         </div>
-
       </div>
-
-      {showPathModal && (
-        <YtdlpPathModal
-          currentPath={ytdlpPath}
-          onSave={newPath => setYtdlpPath(newPath)}
-          onClose={() => setShowPathModal(false)}
-        />
-      )}
 
     </div>
   )

@@ -44,32 +44,35 @@ export type ExportParams = {
 // Tauri event payload — field names must match the Rust struct fields exactly.
 export type ExportProgressPayload = { percent: number }
 
-// yt-dlp downloader types
-export type CookieSource =
-  | { type: 'none' }
-  | { type: 'browser'; browser: string; profile: string }
-  | { type: 'file';    path: string }
+// mangofetch downloader types
 
-export type VideoFormat = {
-  formatId: string       // raw yt-dlp format ID or sentinel like "best"/"audio"
-  label: string          // human-readable compact label
-  ytdlpSelector: string  // yt-dlp format selector passed to -f
-  hasVideo: boolean
-  hasAudio: boolean
-  // metadata columns for the format table (empty string when not applicable)
-  resolution:   string   // e.g. "1920×1080" or "720p"
-  fps:          string   // e.g. "60" or ""
-  codec:        string   // e.g. "av1", "avc1", "vp09"
-  filesize:     string   // e.g. "150 MB", "~80 MB" or ""
-  dynamicRange: string   // e.g. "SDR", "HDR10", "HLG" or ""
-  ext:          string   // container extension e.g. "webm", "mp4"
-  sampleRate:   string   // audio sample rate, e.g. "48000 Hz" or ""
+/** Quality tier passed to `mangofetch download -q`. `best` omits the flag. */
+export type MangofetchQuality = 'best' | '1080p' | '720p' | '480p' | '360p' | 'audio'
+
+/** Coarse phase tag emitted by the Rust backend; mangofetch CLI does not
+    expose per-chunk progress so we show an indeterminate bar between phases. */
+export type MangofetchProgress = {
+  phase: 'fetching' | 'downloading' | 'muxing' | 'done'
 }
 
-export type YtdlpProgress = {
-  percent: number  // 0–100
-  speed: string    // e.g. "1.23MiB/s"
-  eta: string      // e.g. "00:45"
+/** Phases emitted by `update_mangofetch` for the background-update indicator. */
+export type MangofetchUpdate =
+  | { phase: 'running' }
+  | { phase: 'done' }
+  | { phase: 'error'; message: string }
+
+/** Phases emitted by `install_mangofetch` while `cargo install mangofetch` runs.
+    `cargoMissing` means the user has no Rust toolchain — we surface a rustup link. */
+export type MangofetchInstall =
+  | { phase: 'running' }
+  | { phase: 'done' }
+  | { phase: 'cargoMissing' }
+  | { phase: 'error'; message: string }
+
+export type MangofetchConfig = {
+  installed:      boolean   // false if `mangofetch` was not found on PATH or in ~/.cargo/bin
+  mangofetchPath: string    // absolute path; empty if not installed
+  tempDir:        string    // absolute path to the Temp download folder
 }
 
 export type ProjectFile = {
@@ -79,10 +82,4 @@ export type ProjectFile = {
   duration: number
   playheadPosition: number
   segments: Segment[]
-}
-
-export type YtdlpConfig = {
-  ytdlpPath:    string        // absolute path to yt-dlp.exe; empty string if not set
-  tempDir:      string        // absolute path to the Temp download folder
-  cookieSource: CookieSource
 }

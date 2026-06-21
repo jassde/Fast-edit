@@ -200,6 +200,45 @@
   100% { opacity: 0.9; }
 }
 
+/* Indeterminate bar: mangofetch doesn't expose per-chunk percent, so we
+   sweep a striped fill across the track to show life. */
+.downloader-window .progress-bar-fill.progress-bar-indeterminate {
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 30%,
+    color-mix(in srgb, var(--accent) 70%, white) 50%,
+    var(--accent) 70%,
+    transparent 100%
+  );
+  animation: indeterminateSweep 1.4s infinite ease-in-out;
+}
+
+@keyframes indeterminateSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* Status chip in the title bar for background tool updates. */
+.dl-update-chip {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--bg-active);
+  color: var(--text-muted);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+.dl-update-chip-ok {
+  color: color-mix(in srgb, var(--accent) 80%, white);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.dl-update-chip-err {
+  color: #ff9b9b;
+  border-color: #ff9b9b66;
+  cursor: help;
+}
+
 .dl-progress-meta {
   display: flex;
   justify-content: space-between;
