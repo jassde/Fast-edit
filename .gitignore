@@ -31,3 +31,4 @@ src-tauri/lib/
 
 # ffmpeg binaries (not bundled; user-provided alongside the app)
 /ffmpeg/
+/graphify-out
