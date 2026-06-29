@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src-tauri/src/ffmpeg/process.rs",
+    "line": 121,
+    "summary": "String allocation in hot loop may cause performance regression during ffmpeg error output",
+    "failure_scenario": "ffmpeg process fails with many stderr lines (>20). Each non-progress line allocates a String via trimmed.to_string(). For a long ffmpeg run with warning/error messages, this adds overhead compared to the original code which discarded stderr lines entirely. Bounded memory (20 lines * ~100 bytes each = ~2KB), but CPU cost of String allocations is non-zero."
+  },
+  {
+    "file": "src-tauri/src/ffmpeg/mod.rs",
+    "line": 70,
+    "summary": "Missing null/error documentation for run_export internals - no precondition comments for strip_unc_prefix usage",
+    "failure_scenario": "If run_export is refactored to expose strip_unc_prefix, callers won't know it's Windows-only (returns input unchanged on non-Windows). On a Unix machine, the function silently returns the path unmodified when UNC prefix detection is conditional-compiled out, which could mask debugging issues if someone tries to call it directly."
+  },
+  {
+    "file": "src-tauri/src/ffmpeg/types.rs",
+    "line": 114,
+    "summary": "Container::audio_encoder() does not validate Container against source_ext fully",
+    "failure_scenario": "In reencode mode, if source_ext is '.webm' but Container is Source, the function returns 'libopus' correctly. However, there's no explicit validation in run_export (mod.rs line 90-111) that prevents VP9+MP4 before the audio codec is selected. If Container::Source is used with a VP9-only input file in reencode mode, the audio encoder will be 'aac' but the codec is VP9 (incompatible). The codec/container check only validates explicit Container choices, not Source."
+  },
+  {
+    "file": "src-tauri/src/ffmpeg/mod.rs",
+    "line": 131,
+    "summary": "expand_filename not exported but was public in original - breaks semver if external crates depend on it",
+    "failure_scenario": "If any external Rust crate or non-Tauri-based code depended on calling ffmpeg::expand_filename(), the change from pub to pub(crate) is a breaking change. While the repo shows no such usage, the commit message states 'Public API surface is unchanged' but expand_filename WAS public before (git show 3697205^:src-tauri/src/ffmpeg.rs | grep '^pub.*expand_filename'). This violates the semver claim."
+  }
+]
