@@ -3,7 +3,6 @@ import { Segment, HwEncoder, ProjectFile } from '../types'
 import { clamp, newId, pickColor } from '../utils'
 import {
   MIN_FRAME_GAP_S,
-  MIN_SEGMENT_DURATION_S,
   DEFAULT_FRAMES_PER_SCROLL_TICK,
   MIN_FRAMES_PER_SCROLL_TICK,
   MAX_FRAMES_PER_SCROLL_TICK,
@@ -136,11 +135,20 @@ export type AppActions = {
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
   setIsMuted: (muted: boolean) => void
-  addSegment: () => void
+  /** Split the segment containing the playhead into two adjacent segments at the playhead. */
+  splitSegment: () => void
+  /** Create a single segment spanning [0, duration] if none exist; no-op otherwise. */
+  ensureFullSegment: () => void
   deleteSegment: (id: string) => void
   selectSegment: (id: string | null) => void
-  setSegmentStart: (id: string, start: number) => void
-  setSegmentEnd: (id: string, end: number) => void
+  /**
+   * Update a segment's source-start. `minStart` is the inclusive lower bound
+   * (typically the pre-drag seg.start, captured by the trim-handle drag handler
+   * so a single drag can reverse direction without the receiver ratcheting).
+   */
+  setSegmentStart: (id: string, start: number, minStart: number) => void
+  /** As setSegmentStart; `maxEnd` is the inclusive upper bound. */
+  setSegmentEnd: (id: string, end: number, maxEnd: number) => void
   /** Set start of whichever segment is currently selected */
   setSelectedStart: (start: number) => void
   /** Set end of whichever segment is currently selected */
@@ -233,43 +241,6 @@ function sanitizeLoadedSegments(raw: unknown): Segment[] {
   return kept
 }
 
-/** Sort segments by start time and return them alongside their sorted index for a given id. */
-function findSorted(
-  segments: Segment[],
-  id: string,
-): { sorted: Segment[]; idx: number; seg: Segment } | null {
-  const sorted = [...segments].sort((a, b) => a.start - b.start)
-  const idx    = sorted.findIndex(s => s.id === id)
-  if (idx === -1) return null
-  return { sorted, idx, seg: sorted[idx] }
-}
-
-/**
- * Linear-scan neighbor lookup for a segment by id. Returns the segment and the
- * tightest left/right bounds set by the closest non-overlapping neighbors.
- * Avoids the per-call sort + clone that `findSorted` does — used on the drag
- * hot path (setSegmentStart / setSegmentEnd fire on every mousemove).
- */
-function findNeighbors(
-  segments: Segment[],
-  id: string,
-  duration: number,
-): { seg: Segment; leftBound: number; rightBound: number } | null {
-  let seg: Segment | null = null
-  for (const s of segments) {
-    if (s.id === id) { seg = s; break }
-  }
-  if (!seg) return null
-  let leftBound  = 0
-  let rightBound = duration
-  for (const s of segments) {
-    if (s.id === id) continue
-    if (s.end <= seg.start && s.end > leftBound) leftBound = s.end
-    if (s.start >= seg.end && s.start < rightBound) rightBound = s.start
-  }
-  return { seg, leftBound, rightBound }
-}
-
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useAppState(): [AppState, AppActions] {
@@ -309,45 +280,56 @@ export function useAppState(): [AppState, AppActions] {
 
   // ── Segment mutations ────────────────────────────────────────────────────
 
-  const addSegment = useCallback(() => {
+  const splitSegment = useCallback(() => {
     setState(s => {
       if (s.duration === 0) return s
-
-      const DEFAULT_SEG_DURATION = 5
-      const pos    = s.playheadPosition
-      const sorted = [...s.segments].sort((a, b) => a.start - b.start)
-
-      // If the playhead is inside an existing segment, no-op
-      if (sorted.some(seg => pos >= seg.start && pos < seg.end)) return s
-
-      // Bounds: left neighbor's end → right neighbor's start (or video edges)
-      const rightNeighbor = sorted.find(seg => seg.start > pos)
-      const leftNeighbor  = sorted.findLast(seg => seg.end <= pos)
-      const minStart = leftNeighbor  ? leftNeighbor.end   : 0
-      const maxEnd   = rightNeighbor ? rightNeighbor.start : s.duration
-
-      if (maxEnd - minStart < MIN_SEGMENT_DURATION_S) return s  // no room, silent no-op
-
-      const start = clamp(pos, minStart, maxEnd - MIN_SEGMENT_DURATION_S)
-      const end   = clamp(pos + DEFAULT_SEG_DURATION, start + MIN_SEGMENT_DURATION_S, maxEnd)
-
-      const newSeg: Segment = {
-        id:    newId(),
-        start,
-        end,
-        color: pickColor(s.segments.map(seg => seg.color)),
-      }
+      const pos = s.playheadPosition
+      const target = s.segments.find(seg => pos > seg.start && pos < seg.end)
+      if (!target) return s
+      // Both halves must satisfy the standard "at least one frame" gap so the
+      // existing handle-drag clamps don't immediately collapse them.
+      if (pos - target.start < MIN_FRAME_GAP_S) return s
+      if (target.end - pos < MIN_FRAME_GAP_S) return s
 
       pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
 
+      const rightHalf: Segment = {
+        id:    newId(),
+        start: pos,
+        end:   target.end,
+        color: pickColor(s.segments.map(seg => seg.color)),
+      }
       return {
         ...s,
-        segments: [...s.segments, newSeg],
-        selectedSegmentId: newSeg.id,
+        segments: s.segments.map(seg =>
+          seg.id === target.id ? { ...seg, end: pos } : seg
+        ).concat(rightHalf),
+        selectedSegmentId: rightHalf.id,
       }
     })
   }, [pushUndo])
 
+  const ensureFullSegment = useCallback(() => {
+    setState(s => {
+      if (s.duration <= 0) return s
+      if (s.segments.length > 0) return s
+      const seg: Segment = {
+        id:    newId(),
+        start: 0,
+        end:   s.duration,
+        color: pickColor([]),
+      }
+      return {
+        ...s,
+        segments: [seg],
+        selectedSegmentId: seg.id,
+      }
+    })
+  }, [])
+
+  // Ripple delete: remove the segment. The kept-timeline renderer lays
+  // segments out cumulatively by duration, so the gap closes visually without
+  // mutating any other segment's SOURCE positions — keeping the export honest.
   const deleteSegment = useCallback((id: string) => {
     setState(s => {
       if (!s.segments.some(seg => seg.id === id)) return s
@@ -360,31 +342,33 @@ export function useAppState(): [AppState, AppActions] {
     })
   }, [pushUndo])
 
-  const setSegmentStart = useCallback((id: string, start: number) => {
+  // Trim is shrink-only relative to the bounds the caller passes. The caller
+  // (the trim-handle drag in Timeline.tsx) supplies the PRE-drag bounds so a
+  // single drag can reverse direction freely. Using the current seg.start /
+  // seg.end as the bound ratchets the window tighter on every mousemove.
+  const setSegmentStart = useCallback((id: string, start: number, minStart: number) => {
     setState(s => {
-      const found = findNeighbors(s.segments, id, s.duration)
-      if (!found) return s
-      const { seg, leftBound } = found
-      const clampedStart = clamp(start, leftBound, seg.end - MIN_FRAME_GAP_S)
+      const seg = s.segments.find(sg => sg.id === id)
+      if (!seg) return s
+      const clamped = clamp(start, minStart, seg.end - MIN_FRAME_GAP_S)
       return {
         ...s,
         segments: s.segments.map(sg =>
-          sg.id === id ? { ...sg, start: clampedStart } : sg
+          sg.id === id ? { ...sg, start: clamped } : sg
         ),
       }
     })
   }, [])
 
-  const setSegmentEnd = useCallback((id: string, end: number) => {
+  const setSegmentEnd = useCallback((id: string, end: number, maxEnd: number) => {
     setState(s => {
-      const found = findNeighbors(s.segments, id, s.duration)
-      if (!found) return s
-      const { seg, rightBound } = found
-      const clampedEnd = clamp(end, seg.start + MIN_FRAME_GAP_S, rightBound)
+      const seg = s.segments.find(sg => sg.id === id)
+      if (!seg) return s
+      const clamped = clamp(end, seg.start + MIN_FRAME_GAP_S, maxEnd)
       return {
         ...s,
         segments: s.segments.map(sg =>
-          sg.id === id ? { ...sg, end: clampedEnd } : sg
+          sg.id === id ? { ...sg, end: clamped } : sg
         ),
       }
     })
@@ -393,11 +377,9 @@ export function useAppState(): [AppState, AppActions] {
   const setSelectedStart = useCallback((start: number) => {
     setState(s => {
       if (!s.selectedSegmentId) return s
-      const found = findSorted(s.segments, s.selectedSegmentId)
-      if (!found) return s
-      const { sorted, idx, seg } = found
-      const leftBound = idx > 0 ? sorted[idx - 1].end : 0
-      const clamped   = clamp(start, leftBound, seg.end - MIN_FRAME_GAP_S)
+      const seg = s.segments.find(sg => sg.id === s.selectedSegmentId)
+      if (!seg) return s
+      const clamped = clamp(start, seg.start, seg.end - MIN_FRAME_GAP_S)
       if (clamped === seg.start) return s   // no-op: don't pollute undo
       pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
       return {
@@ -412,11 +394,9 @@ export function useAppState(): [AppState, AppActions] {
   const setSelectedEnd = useCallback((end: number) => {
     setState(s => {
       if (!s.selectedSegmentId) return s
-      const found = findSorted(s.segments, s.selectedSegmentId)
-      if (!found) return s
-      const { sorted, idx, seg } = found
-      const rightBound = idx < sorted.length - 1 ? sorted[idx + 1].start : s.duration
-      const clamped    = clamp(end, seg.start + MIN_FRAME_GAP_S, rightBound)
+      const seg = s.segments.find(sg => sg.id === s.selectedSegmentId)
+      if (!seg) return s
+      const clamped = clamp(end, seg.start + MIN_FRAME_GAP_S, seg.end)
       if (clamped === seg.end) return s   // no-op: don't pollute undo
       pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
       return {
@@ -585,7 +565,8 @@ export function useAppState(): [AppState, AppActions] {
     setPlayheadPosition,
     setIsPlaying,
     setIsMuted,
-    addSegment,
+    splitSegment,
+    ensureFullSegment,
     deleteSegment,
     selectSegment,
     setSegmentStart,
@@ -610,7 +591,7 @@ export function useAppState(): [AppState, AppActions] {
     endDrag,
   }), [
     setFilePath, setDuration, setFps, setPlayheadPosition, setIsPlaying, setIsMuted,
-    addSegment, deleteSegment, selectSegment,
+    splitSegment, ensureFullSegment, deleteSegment, selectSegment,
     setSegmentStart, setSegmentEnd, setSelectedStart, setSelectedEnd,
     openExportModal, closeExportModal,
     openSettingsModal, closeSettingsModal,

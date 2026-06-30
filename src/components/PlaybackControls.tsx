@@ -18,7 +18,7 @@ type PlaybackControlsProps = {
   segmentCount: number;
   onSetStart: () => void;
   onSetEnd: () => void;
-  onAddSegment: () => void;
+  onSplit: () => void;
   onDeleteSegment: () => void;
   onSelectNext: () => void;
   // zoom
@@ -96,17 +96,21 @@ const IconMuted = () => (
     />
   </svg>
 );
-const IconAdd = () => (
+// Scissors — a vertical blade between two finger-loops. Reads as "cut here".
+const IconSplit = () => (
   <svg
     viewBox="0 0 16 16"
     fill="none"
     stroke="currentColor"
-    strokeWidth="2"
+    strokeWidth="1.6"
     strokeLinecap="round"
+    strokeLinejoin="round"
     aria-hidden="true"
   >
-    <line x1="8" y1="3" x2="8" y2="13" />
-    <line x1="3" y1="8" x2="13" y2="8" />
+    <circle cx="4" cy="11.5" r="2" />
+    <circle cx="12" cy="11.5" r="2" />
+    <line x1="5.5" y1="10" x2="13" y2="2.5" />
+    <line x1="10.5" y1="10" x2="3" y2="2.5" />
   </svg>
 );
 const IconTrash = () => (
@@ -142,7 +146,7 @@ export function PlaybackControls({
   segmentCount,
   onSetStart,
   onSetEnd,
-  onAddSegment,
+  onSplit,
   onDeleteSegment,
   onSelectNext,
   zoom,
@@ -158,11 +162,11 @@ export function PlaybackControls({
         <button
           className="btn btn-icon btn-add-delete"
           disabled={!hasFile}
-          onClick={onAddSegment}
-          title="Add a new 5-second segment at the playhead position"
-          aria-label="Add segment"
+          onClick={onSplit}
+          title="Split the segment under the playhead in two"
+          aria-label="Split segment at playhead"
         >
-          <IconAdd />
+          <IconSplit />
         </button>
         <button
           className="btn btn-icon btn-add-delete btn-danger-icon"

@@ -1053,6 +1053,17 @@ body,
         filter 130ms var(--ease-out),
         box-shadow 160ms var(--ease-out);
 }
+
+/* Snap-close after a trim drag: segments slide from their frozen
+   (gap-revealing) positions to the live cumulative positions. The class is
+   added only for the duration of this transition so zoom and other layout
+   changes stay instant. */
+.segment-block.animating-trim-close {
+    transition:
+        left 200ms var(--ease-out),
+        filter 130ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
+}
 .segment-block:hover {
     filter: brightness(1.18);
 }
@@ -1129,6 +1140,28 @@ body,
     width: 1px;
     background: color-mix(in oklch, var(--accent) 85%, transparent);
     box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* ── Filmstrip ───────────────────────────────────────────────────────────── */
+.filmstrip {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.filmstrip-frame {
+    flex: none;
+    height: 100%;
+    aspect-ratio: 16 / 9;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.55;
+}
+
+.filmstrip-frame + .filmstrip-frame {
+    border-left: 1px solid rgba(0, 0, 0, 0.25);
 }
 
 /* ── Modals ──────────────────────────────────────────────────────────────── */

@@ -266,6 +266,101 @@ pub fn get_hw_support(state: State<'_, Mutex<FfmpegState>>) -> HwSupport {
         .clone()
 }
 
+/// Extract `count` evenly-spaced thumbnail frames from `file_path`, running all
+/// ffmpeg seeks in parallel so the total wall-clock time is one seek, not N.
+fn extract_thumbnails_sync(
+    ffmpeg_path: &Path,
+    file_path: &str,
+    duration: f64,
+    count: usize,
+) -> Result<Vec<String>, String> {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+    use std::process::Stdio;
+    use std::sync::Arc;
+
+    if duration <= 0.0 || count == 0 {
+        return Ok(vec![]);
+    }
+
+    let tmp_dir = std::env::temp_dir().join("fast_edit_thumbs");
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    std::fs::create_dir_all(&tmp_dir)
+        .map_err(|e| format!("Failed to create thumb dir: {e}"))?;
+
+    let ffmpeg_path = Arc::new(ffmpeg_path.to_path_buf());
+    let file_path   = Arc::new(file_path.to_string());
+    let tmp_dir     = Arc::new(tmp_dir);
+
+    // Spawn all seeks in parallel — startup cost overlaps instead of stacking.
+    let handles: Vec<_> = (0..count)
+        .map(|i| {
+            let t           = (i as f64 + 0.5) * duration / count as f64;
+            let ffmpeg_path = Arc::clone(&ffmpeg_path);
+            let file_path   = Arc::clone(&file_path);
+            let tmp_dir     = Arc::clone(&tmp_dir);
+
+            std::thread::spawn(move || {
+                let out_path = tmp_dir.join(format!("thumb_{i:03}.jpg"));
+                let mut cmd  = std::process::Command::new(ffmpeg_path.as_ref());
+                cmd.args([
+                    "-y",
+                    "-ss", &format!("{t:.3}"),
+                    "-i", file_path.as_str(),
+                    "-vframes", "1",
+                    "-vf", "scale=160:-2",
+                    "-q:v", "5",
+                    "-an",
+                ])
+                .arg(out_path.as_os_str())
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+                process::hide_console(&mut cmd);
+
+                let ok = cmd.status().map(|s| s.success()).unwrap_or(false);
+                if ok {
+                    if let Ok(bytes) = std::fs::read(&out_path) {
+                        return (i, format!("data:image/jpeg;base64,{}", STANDARD.encode(&bytes)));
+                    }
+                }
+                (i, String::new())
+            })
+        })
+        .collect();
+
+    let mut results = vec![String::new(); count];
+    for handle in handles {
+        if let Ok((i, data)) = handle.join() {
+            results[i] = data;
+        }
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn generate_thumbnails(
+    file_path: String,
+    duration: f64,
+    count: usize,
+    state: State<'_, Mutex<FfmpegState>>,
+) -> Result<Vec<String>, String> {
+    let count = count.clamp(1, 60);
+    let ffmpeg_path = {
+        let guard = state.lock().unwrap_or_else(|e| e.into_inner());
+        guard.ffmpeg_path.clone()
+    };
+    let ffmpeg_path = ffmpeg_path
+        .ok_or_else(|| "ffmpeg not found".to_string())?;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        extract_thumbnails_sync(&ffmpeg_path, &file_path, duration, count)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn pick_output_dir(app: AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
