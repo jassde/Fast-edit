@@ -361,6 +361,35 @@ export default function App() {
     setTimelineZoom(defaultZoomForDuration(state.duration));
   }, [state.filePath, state.duration]);
 
+  // On a fresh file load, once mpv reports duration, seed the timeline with
+  // one segment spanning the whole video so it acts as the starting point for
+  // splits. ensureFullSegment is a no-op if segments already exist (e.g. when
+  // a saved project loaded segments), so this is safe to run on every change.
+  useEffect(() => {
+    if (!state.filePath || state.duration <= 0) return;
+    actions.ensureFullSegment();
+  }, [state.filePath, state.duration, actions]);
+
+  // Filmstrip thumbnails — extracted once per file when duration is known.
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const thumbFileRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state.filePath || state.duration <= 0) {
+      if (!state.filePath) thumbFileRef.current = null;
+      return;
+    }
+    if (thumbFileRef.current === state.filePath) return;
+    thumbFileRef.current = state.filePath;
+    setThumbnails([]);
+    invoke<string[]>("generate_thumbnails", {
+      filePath: state.filePath,
+      duration: state.duration,
+      count: 30,
+    })
+      .then(setThumbnails)
+      .catch(() => {});
+  }, [state.filePath, state.duration]);
+
   // Single sorted copy shared by the segment indicator and handleSelectNext.
   const sortedSegments = useMemo(
     () => [...state.segments].sort((a, b) => a.start - b.start),
@@ -642,7 +671,7 @@ export default function App() {
             actions.setSelectedEnd(state.playheadPosition);
           }
         }}
-        onAddSegment={actions.addSegment}
+        onSplit={actions.splitSegment}
         onDeleteSegment={() => {
           if (state.selectedSegmentId) {
             actions.deleteSegment(state.selectedSegmentId);
@@ -661,6 +690,7 @@ export default function App() {
           selectedSegmentId={state.selectedSegmentId}
           playheadPosition={state.playheadPosition}
           zoom={timelineZoom}
+          thumbnails={thumbnails}
           onSeek={handleSeek}
           onSelectSegment={actions.selectSegment}
           onUpdateSegmentStart={actions.setSegmentStart}

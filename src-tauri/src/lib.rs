@@ -46,6 +46,7 @@ pub fn run() {
             ffmpeg::export_segments,
             ffmpeg::pick_output_dir,
             ffmpeg::get_hw_support,
+            ffmpeg::generate_thumbnails,
             mangofetch::get_mangofetch_config,
             mangofetch::install_mangofetch,
             mangofetch::update_mangofetch,

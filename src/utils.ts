@@ -4,6 +4,7 @@ import {
   MAX_TIMELINE_ZOOM,
   DEFAULT_TARGET_VISIBLE_SECONDS,
 } from './constants'
+import type { Segment } from './types'
 
 /** Format seconds to HH:MM:SS.mmm */
 export function formatTime(seconds: number): string {
@@ -53,6 +54,71 @@ export function timeToPixel(time: number, containerWidth: number, duration: numb
 /** Generate a unique segment id */
 export function newId(): string {
   return crypto.randomUUID()
+}
+
+// ── Source ↔ kept-timeline mapping ───────────────────────────────────────────
+// Segments hold SOURCE positions (start, end). The visual timeline lays them
+// out cumulatively by duration so the user only sees "kept content" — the
+// space between kept ranges is collapsed away. These helpers translate
+// between the two.
+
+/** Sort segments by source-start, stable. */
+export function sortedByStart(segs: readonly Segment[]): Segment[] {
+  return [...segs].sort((a, b) => a.start - b.start)
+}
+
+/** Total kept-content duration (sum of per-segment durations). */
+export function keptDuration(segs: readonly Segment[]): number {
+  let t = 0
+  for (const s of segs) t += s.end - s.start
+  return t
+}
+
+/**
+ * Kept-time offset of the start of segment `index` in a sorted segment list.
+ * O(n). The caller passes a pre-sorted list so this stays cheap on the hot path.
+ */
+export function keptOffsetOfSegment(sorted: readonly Segment[], index: number): number {
+  let t = 0
+  for (let i = 0; i < index; i++) t += sorted[i].end - sorted[i].start
+  return t
+}
+
+/**
+ * Map a SOURCE time to the corresponding kept-timeline time. Returns null when
+ * the source time falls in a gap (a deleted region). Sorted segments required.
+ */
+export function sourceToKept(srcT: number, sorted: readonly Segment[]): number | null {
+  let acc = 0
+  for (const s of sorted) {
+    if (srcT >= s.start && srcT <= s.end) return acc + (srcT - s.start)
+    acc += s.end - s.start
+  }
+  return null
+}
+
+/**
+ * Map a kept-timeline time to the corresponding SOURCE time plus the id of the
+ * segment that owns it. Clamps to the nearest segment edge if `keptT` falls
+ * outside the kept range.
+ */
+export function keptToSource(
+  keptT: number,
+  sorted: readonly Segment[],
+): { sourceT: number; clipId: string } | null {
+  if (sorted.length === 0) return null
+  let acc = 0
+  for (const s of sorted) {
+    const d = s.end - s.start
+    if (keptT <= acc + d) {
+      const rel = Math.max(0, keptT - acc)
+      return { sourceT: s.start + rel, clipId: s.id }
+    }
+    acc += d
+  }
+  // Past the end: clamp to last segment's end.
+  const last = sorted[sorted.length - 1]
+  return { sourceT: last.end, clipId: last.id }
 }
 
 /**

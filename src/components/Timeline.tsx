@@ -1,52 +1,60 @@
 import { Fragment, useRef, useCallback, useState, useMemo, useEffect } from 'react'
 import { Segment } from '../types'
-import { clamp, pixelToTime, timeToPixel, formatTime } from '../utils'
-import { MIN_SEGMENT_PX } from '../constants'
+import {
+  clamp,
+  formatTime,
+  keptToSource,
+  sortedByStart,
+  sourceToKept,
+} from '../utils'
+import { MIN_SEGMENT_PX, MIN_FRAME_GAP_S } from '../constants'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
+//
+// `playheadPosition` and the start/end fields of each Segment are all in
+// SOURCE time (matching mpv's clock and the export pipeline). The renderer
+// projects them onto a "kept timeline" — segments laid out cumulatively by
+// duration, so deleted/trimmed source content collapses out of view.
 
 type TimelineProps = {
+  /** Source duration (mpv's clock). Only used to gate "is a file loaded?". */
   duration: number
   segments: Segment[]
   selectedSegmentId: string | null
+  /** SOURCE time. */
   playheadPosition: number
-  /**
-   * Magnification factor. 1 = full timeline visible. Higher zoom shows a
-   * window of `duration / zoom` seconds, auto-centered on the playhead and
-   * clamped to the video bounds.
-   */
+  /** Magnification factor. 1 = full kept timeline visible. */
   zoom: number
+  /** Base64 JPEG data URLs for the filmstrip, evenly spaced across the source. */
+  thumbnails?: string[]
+  /** Called with a SOURCE time. */
   onSeek: (time: number) => void
   onSelectSegment: (id: string | null) => void
-  onUpdateSegmentStart: (id: string, start: number) => void
-  onUpdateSegmentEnd: (id: string, end: number) => void
-  /** Called on handle mousedown — captures pre-drag state for undo coalescing. */
+  /** Called with a SOURCE time + the pre-drag lower bound (shrink-only on the receiver). */
+  onUpdateSegmentStart: (id: string, start: number, minStart: number) => void
+  /** Called with a SOURCE time + the pre-drag upper bound (shrink-only on the receiver). */
+  onUpdateSegmentEnd: (id: string, end: number, maxEnd: number) => void
   onDragBegin: () => void
-  /** Called on handle mouseup — commits the coalesced snapshot to undo stack. */
   onDragEnd: () => void
 }
 
+// Each filmstrip frame slot is sized at 16:9 × the segments-area height.
+const FILMSTRIP_AREA_H = 86  // must match CSS: timeline-container(116) - ruler-area(30)
+const FILMSTRIP_FRAME_W = Math.round(FILMSTRIP_AREA_H * (16 / 9))  // ~153 px
+
 // ── Ruler tick interval ───────────────────────────────────────────────────────
 
-// Major intervals that labels snap to. Minor ticks subdivide each major interval.
-// Smallest is 1s — sub-second intervals would force formatTickLabel to round
-// to integers, causing adjacent labels to collide (e.g. 0.5s and 1.0s both
-// rendering as "0:01").
 const NICE_INTERVALS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
-
-/** How many minor subdivisions between each major (label-bearing) tick. */
 const SUBDIVISIONS = 5
 
 function computeTickInterval(visibleDuration: number, widthPx: number): number {
   if (widthPx === 0 || visibleDuration === 0) return 1
   const pixelsPerSecond = widthPx / visibleDuration
-  // Target ~80 px between major ticks → more labels visible at once
   const TARGET_PX = 80
   const rawInterval = TARGET_PX / pixelsPerSecond
   return NICE_INTERVALS.find(v => v >= rawInterval) ?? 3600
 }
 
-/** Format seconds as H:MM:SS, M:SS, or 0:SS depending on magnitude. */
 function formatTickLabel(seconds: number): string {
   const s = Math.round(seconds)
   if (s < 0) return '0:00'
@@ -65,6 +73,7 @@ export function Timeline({
   selectedSegmentId,
   playheadPosition,
   zoom,
+  thumbnails,
   onSeek,
   onSelectSegment,
   onUpdateSegmentStart,
@@ -74,17 +83,6 @@ export function Timeline({
 }: TimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Track the container's pixel width so ruler ticks and segment blocks
-  // recompute whenever the timeline is resized (e.g. window resize, sidebar
-  // open/close). Without this, segments stay at stale pixel positions until
-  // the next state-driven re-render.
-  //
-  // Two parallel trackers:
-  //  - containerWidth  (state) → triggers re-renders, used in useMemo dep arrays
-  //  - containerWidthRef (ref) → always current, used inside startDrag's
-  //    onMouseMove closure where the state value would be stale (startDrag is a
-  //    useCallback whose deps don't include containerWidth, so it captures the
-  //    getWidth from its last creation — the same pattern as visibleDurationRef).
   const [containerWidth, setContainerWidth] = useState(0)
   const containerWidthRef = useRef(0)
   useEffect(() => {
@@ -100,52 +98,121 @@ export function Timeline({
     return () => ro.disconnect()
   }, [])
 
-  // Reads the ref so all closures (including stale ones in startDrag) always
-  // get the current width, regardless of when they were created.
   const getWidth = () => containerWidthRef.current
 
-  // ── Visible-window math (zoom) ──────────────────────────────────────────
-  // At zoom=1 the entire video is visible. At higher zooms we show a window
-  // of `duration / zoom` seconds, auto-centered on the playhead and clamped
-  // to the video bounds. All time↔pixel conversions below are in this window.
-  const safeZoom         = Math.max(1, zoom)
-  const visibleDuration  = duration > 0 ? duration / safeZoom : 0
-  const maxViewStart     = Math.max(0, duration - visibleDuration)
-  const viewStart        = duration > 0
-    ? clamp(playheadPosition - visibleDuration / 2, 0, maxViewStart)
-    : 0
+  // ── Cumulative kept-space layout ────────────────────────────────────────
+  // Segments are sorted by source-start and laid out left-to-right by duration.
+  // `placed` carries the kept-space offset alongside each segment so the
+  // renderer doesn't have to recompute the prefix sum per element.
+  const { sortedSegs, keptDur, placed } = useMemo(() => {
+    const sorted = sortedByStart(segments)
+    const placedArr: { seg: Segment; keptStart: number; keptEnd: number }[] = []
+    let acc = 0
+    for (const seg of sorted) {
+      const d = seg.end - seg.start
+      placedArr.push({ seg, keptStart: acc, keptEnd: acc + d })
+      acc += d
+    }
+    return { sortedSegs: sorted, keptDur: acc, placed: placedArr }
+  }, [segments])
 
-  // While a handle is being dragged we freeze the view origin. Without this,
-  // each drag mousemove seeks → moves the playhead → recomputes viewStart →
-  // the pixel origin slides under the cursor, so at high zoom the grabbed edge
-  // visibly drifts away. `dragViewStart` holds the frozen origin during a drag.
+  // Playhead in kept-space; null when the source playhead is in a deleted gap.
+  const playheadKept = useMemo(
+    () => (keptDur > 0 ? sourceToKept(playheadPosition, sortedSegs) : null),
+    [playheadPosition, sortedSegs, keptDur],
+  )
+
+  // ── Visible-window math (zoom) ──────────────────────────────────────────
+  // When the source playhead falls in a deleted gap (playheadKept == null) we
+  // hold the last good viewStart so the viewport doesn't teleport back to 0
+  // every frame while playback crosses the gap. Mutating the ref here is a
+  // pure cache of derived values — safe across StrictMode double-invokes.
+  const lastViewStartRef = useRef(0)
+  const safeZoom         = Math.max(1, zoom)
+  const visibleDuration  = keptDur > 0 ? keptDur / safeZoom : 0
+  const maxViewStart     = Math.max(0, keptDur - visibleDuration)
+  let viewStart: number
+  if (keptDur === 0) {
+    viewStart = 0
+  } else if (playheadKept != null) {
+    viewStart = clamp(playheadKept - visibleDuration / 2, 0, maxViewStart)
+    lastViewStartRef.current = viewStart
+  } else {
+    viewStart = clamp(lastViewStartRef.current, 0, maxViewStart)
+  }
+
+  // Freeze the view origin during a drag so the dragged edge doesn't slide
+  // under the cursor when the playhead-driven auto-center recomputes.
   const [dragViewStart, setDragViewStart] = useState<number | null>(null)
   const effectiveViewStart = dragViewStart ?? viewStart
 
-  // ── Drag handle logic ───────────────────────────────────────────────────
-  // The drag effect operates in time-space, so it has to mirror visibleDuration
-  // (the dragged distance in pixels translates to a smaller time delta when
-  // zoomed in). viewStart is mirrored too so the freeze can capture the live
-  // value without re-registering the callback.
+  // ── Trim animation: drag snapshot + close-gap state ─────────────────────
+  // During a drag we render the dragged segment's edge under the cursor and
+  // hold "after" segments at their pre-drag positions, leaving a visible gap
+  // where the trimmed-off kept-content used to be. On release we drop the
+  // snapshot and let CSS transition the elements from their frozen positions
+  // to the live cumulative positions (the gap closes).
+  const [dragSnap, setDragSnap] = useState<
+    { id: string; originalDur: number; type: 'start' | 'end' } | null
+  >(null)
+  const [animatingClose, setAnimatingClose] = useState(false)
+  const closeTimerRef = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+  }, [])
+
+  // Locate the dragged segment + compute the "phantom gap" — the amount of
+  // kept-time we're holding open while the user drags. Zero when no drag.
+  const { draggedIndex, phantomGap, draggedType } = useMemo(() => {
+    if (!dragSnap) return { draggedIndex: -1, phantomGap: 0, draggedType: null as 'start' | 'end' | null }
+    const idx = placed.findIndex(p => p.seg.id === dragSnap.id)
+    if (idx === -1) return { draggedIndex: -1, phantomGap: 0, draggedType: null as 'start' | 'end' | null }
+    const currentDur = placed[idx].keptEnd - placed[idx].keptStart
+    return {
+      draggedIndex: idx,
+      phantomGap: Math.max(0, dragSnap.originalDur - currentDur),
+      draggedType: dragSnap.type,
+    }
+  }, [dragSnap, placed])
+
+  // Mirrors of the kept-space view state, captured by drag closures whose
+  // dependency arrays don't include them (would re-register on every change).
   const visibleDurationRef = useRef(visibleDuration)
   visibleDurationRef.current = visibleDuration
   const viewStartRef = useRef(viewStart)
   viewStartRef.current = viewStart
+  const sortedSegsRef = useRef(sortedSegs)
+  sortedSegsRef.current = sortedSegs
 
+  // ── Drag handle logic ───────────────────────────────────────────────────
+  // Pixel deltas convert to KEPT-time deltas. Within a single clip the kept
+  // axis is 1:1 with source, so the delta applies straight to seg.start /
+  // seg.end as a SOURCE delta.
+  //
+  // Drag-scoped clamping uses the segment's PRE-drag bounds so a single drag
+  // can reverse direction freely. Doing the clamp inside setSegmentStart/End
+  // (against the *current* bounds) ratchets — every mousemove tightens the
+  // window. We also clamp the value handed to onSeek so an overshoot drag
+  // can't fling mpv into an unrelated source region.
   const startDrag = useCallback(
     (e: React.MouseEvent, type: 'start' | 'end', seg: Segment) => {
       e.preventDefault()
       e.stopPropagation()
 
       const startX = e.clientX
-      const originalTime = type === 'start' ? seg.start : seg.end
+      const originalStart = seg.start
+      const originalEnd   = seg.end
+      const originalTime  = type === 'start' ? originalStart : originalEnd
 
-      // Freeze the view origin for the duration of this drag.
+      // If a previous close animation is still playing, end it now — the new
+      // drag should start with no transition on its mousemove updates.
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
+      setAnimatingClose(false)
+      setDragSnap({ id: seg.id, originalDur: originalEnd - originalStart, type })
       setDragViewStart(viewStartRef.current)
-
-      // Capture pre-drag state for undo coalescing. The matching onDragEnd in
-      // onMouseUp pushes one undo entry — no matter how many intermediate
-      // setSegmentStart/End calls fire from onMouseMove.
       onDragBegin()
 
       function onMouseMove(ev: MouseEvent) {
@@ -153,21 +220,37 @@ export function Timeline({
         const vd = visibleDurationRef.current
         const dx = ev.clientX - startX
         const dt = vd > 0 ? (dx / w) * vd : 0
-        const newTime = originalTime + dt
+        const raw = originalTime + dt
+
+        // Clamp here too so the playhead seek can't fling mpv into a region
+        // outside the segment being trimmed. The receiver enforces the same
+        // range authoritatively via the pre-drag bounds we pass below.
+        const clamped = type === 'start'
+          ? clamp(raw, originalStart, originalEnd - MIN_FRAME_GAP_S)
+          : clamp(raw, originalStart + MIN_FRAME_GAP_S, originalEnd)
 
         if (type === 'start') {
-          onUpdateSegmentStart(seg.id, newTime)
+          onUpdateSegmentStart(seg.id, clamped, originalStart)
         } else {
-          onUpdateSegmentEnd(seg.id, newTime)
+          onUpdateSegmentEnd(seg.id, clamped, originalEnd)
         }
-        onSeek(newTime)
+        onSeek(clamped)
       }
 
       function onMouseUp() {
         document.removeEventListener('mousemove', onMouseMove)
         document.removeEventListener('mouseup', onMouseUp)
-        // Release the frozen origin → resume auto-centering on the playhead.
         setDragViewStart(null)
+        // Clearing dragSnap drops the phantom-gap shift; adding animatingClose
+        // in the same render enables the CSS transition so segments slide from
+        // their frozen positions to live cumulative positions. The class is
+        // removed shortly after the transition completes.
+        setDragSnap(null)
+        setAnimatingClose(true)
+        closeTimerRef.current = window.setTimeout(() => {
+          setAnimatingClose(false)
+          closeTimerRef.current = null
+        }, 240)
         onDragEnd()
       }
 
@@ -178,32 +261,30 @@ export function Timeline({
   )
 
   // ── Click ruler to seek ─────────────────────────────────────────────────
-
+  // Click x → kept-time → source-time (via keptToSource).
   const handleRulerMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (!containerRef.current || duration === 0) return
+      if (!containerRef.current || keptDur === 0) return
       const rect = containerRef.current.getBoundingClientRect()
-      const time = effectiveViewStart + pixelToTime(e.clientX - rect.left, rect.width, visibleDuration)
-      onSeek(time)
+      const px   = e.clientX - rect.left
+      const vd   = visibleDurationRef.current
+      const keptT = effectiveViewStart + (vd > 0 ? (px / rect.width) * vd : 0)
+      const hit  = keptToSource(keptT, sortedSegsRef.current)
+      if (hit) onSeek(hit.sourceT)
     },
-    [duration, effectiveViewStart, visibleDuration, onSeek]
+    [keptDur, effectiveViewStart, onSeek]
   )
 
   // ── Render ──────────────────────────────────────────────────────────────
 
-  // containerWidth (state) drives re-renders and useMemo deps.
-  // getWidth() (ref) is used inside event-handler closures where state would be stale.
-  const w = containerWidth  // may be 0 on first render — that's fine, ticks won't show
+  const w = containerWidth
 
-  // Convert an absolute time into a visible-window pixel x.
-  const xOf = (t: number) => timeToPixel(t - effectiveViewStart, w, visibleDuration)
+  // Kept-time → pixel
+  const xOfKept = (keptT: number) =>
+    visibleDuration > 0 ? ((keptT - effectiveViewStart) / visibleDuration) * w : 0
 
-  // Ruler ticks and segment blocks are memoized on everything they depend on
-  // *except* playheadPosition. At zoom = 1 effectiveViewStart is constant, so
-  // these element references stay stable while the playhead moves ~30–60×/s and
-  // React skips re-rendering them — only the inline playhead below moves.
   const rulerTicks = useMemo(() => {
-    if (!(duration > 0 && w > 0 && visibleDuration > 0)) return null
+    if (!(keptDur > 0 && w > 0 && visibleDuration > 0)) return null
 
     const majorInterval = computeTickInterval(visibleDuration, w)
     const minorInterval = majorInterval / SUBDIVISIONS
@@ -213,10 +294,8 @@ export function Timeline({
 
     for (let t = firstTick; t <= lastTick; t += minorInterval) {
       if (t < 0) continue
-      // A tick is "major" when it falls on a multiple of the major interval.
-      // Round to avoid float drift (e.g. 0.999999 vs 1.0).
       const isMajor = Math.abs(Math.round(t / majorInterval) * majorInterval - t) < 1e-6
-      const x = timeToPixel(t - effectiveViewStart, w, visibleDuration)
+      const x = ((t - effectiveViewStart) / visibleDuration) * w
 
       els.push(
         <Fragment key={t}>
@@ -230,26 +309,71 @@ export function Timeline({
       )
     }
     return els
-  }, [duration, w, effectiveViewStart, visibleDuration])
+  }, [keptDur, w, effectiveViewStart, visibleDuration])
+
+  // Filmstrip — each slot's kept-time maps back to a SOURCE time (via
+  // keptToSource) and then to the nearest thumbnail (which is indexed by
+  // source position, since extraction happened against the source).
+  const filmstrip = useMemo(() => {
+    if (!thumbnails?.length || keptDur === 0 || w === 0 || visibleDuration === 0 || duration <= 0) {
+      return null
+    }
+    const slots = Math.max(1, Math.ceil(w / FILMSTRIP_FRAME_W) + 1)
+    const frames: string[] = []
+    for (let i = 0; i < slots; i++) {
+      const keptT = effectiveViewStart + ((i + 0.5) / slots) * visibleDuration
+      const hit   = keptToSource(keptT, sortedSegs)
+      if (!hit) {
+        frames.push('')
+        continue
+      }
+      const frac = Math.max(0, Math.min(1, hit.sourceT / duration))
+      const idx  = Math.round(frac * (thumbnails.length - 1))
+      frames.push(thumbnails[Math.max(0, Math.min(thumbnails.length - 1, idx))])
+    }
+    return (
+      <div className="filmstrip">
+        {frames.map((src, i) => (
+          <div
+            key={i}
+            className="filmstrip-frame"
+            style={src ? { backgroundImage: `url(${src})` } : undefined}
+          />
+        ))}
+      </div>
+    )
+  }, [thumbnails, duration, keptDur, sortedSegs, effectiveViewStart, visibleDuration, w])
 
   const segmentBlocks = useMemo(() =>
-    segments.map(seg => {
-      const left      = duration > 0 ? timeToPixel(seg.start - effectiveViewStart, w, visibleDuration) : 0
-      const right     = duration > 0 ? timeToPixel(seg.end   - effectiveViewStart, w, visibleDuration) : 0
+    placed.map(({ seg, keptStart, keptEnd }, i) => {
+      // Phantom-gap shift during an active trim drag:
+      //   - segments AFTER the dragged one render at their pre-drag offsets
+      //     (shifted right by phantomGap relative to live cumulative)
+      //   - the dragged segment itself shifts right ONLY on a LEFT-handle
+      //     drag, so its left edge follows the cursor. RIGHT-handle drag
+      //     already renders correctly at the cumulative position.
+      let shift = 0
+      if (draggedIndex >= 0) {
+        if (i > draggedIndex) shift = phantomGap
+        else if (i === draggedIndex && draggedType === 'start') shift = phantomGap
+      }
+      const dispLeft  = keptStart + shift
+      const dispRight = keptEnd   + shift
+      const left  = ((dispLeft  - effectiveViewStart) / Math.max(visibleDuration, 1e-9)) * w
+      const right = ((dispRight - effectiveViewStart) / Math.max(visibleDuration, 1e-9)) * w
       const realWidth = right - left
       const isTiny    = realWidth < MIN_SEGMENT_PX
       const width     = isTiny ? 2 : realWidth
       const isSelected = seg.id === selectedSegmentId
 
-      // Layered fill: a vivid color-mix base + a subtle top-light gradient for
-      // depth. Keeps timeline readable while making segments pop more than the
-      // previous flat 28% mix.
       const bg = `linear-gradient(180deg, color-mix(in oklch, ${seg.color} 52%, transparent) 0%, color-mix(in oklch, ${seg.color} 34%, transparent) 100%)`
+
+      const cls = `segment-block${isSelected ? ' selected' : ''}${isTiny ? ' tiny' : ''}${animatingClose ? ' animating-trim-close' : ''}`
 
       return (
         <div
           key={seg.id}
-          className={`segment-block${isSelected ? ' selected' : ''}${isTiny ? ' tiny' : ''}`}
+          className={cls}
           style={{
             left,
             width,
@@ -260,56 +384,52 @@ export function Timeline({
             e.stopPropagation()
             onSelectSegment(seg.id)
           }}
-          title={`${formatTime(seg.start)} to ${formatTime(seg.end)}`}
+          title={`Source ${formatTime(seg.start)} → ${formatTime(seg.end)}`}
         >
-          {/* Drag handles only when the segment is wide enough to host them. */}
           {!isTiny && (
             <>
               <div
                 className="seg-handle seg-handle-left"
                 onMouseDown={e => startDrag(e, 'start', seg)}
-                title="Drag to adjust start (or press I)"
+                title="Drag to trim start (or press I)"
               />
               <div
                 className="seg-handle seg-handle-right"
                 onMouseDown={e => startDrag(e, 'end', seg)}
-                title="Drag to adjust end (or press O)"
+                title="Drag to trim end (or press O)"
               />
             </>
           )}
         </div>
       )
     }),
-    [segments, selectedSegmentId, duration, w, effectiveViewStart, visibleDuration, startDrag, onSelectSegment]
+    [placed, selectedSegmentId, w, effectiveViewStart, visibleDuration, startDrag, onSelectSegment, draggedIndex, phantomGap, draggedType, animatingClose]
   )
 
-  const playheadX = duration > 0 ? xOf(playheadPosition) : 0
+  const playheadX = playheadKept != null ? xOfKept(playheadKept) : null
 
   return (
     <div
       ref={containerRef}
       className="timeline-container"
     >
-      {/* ── Ruler ── */}
       <div className="ruler-area" onMouseDown={handleRulerMouseDown}>
         {rulerTicks}
       </div>
 
-      {/* ── Segments ── */}
       <div
         className="segments-area"
         onMouseDown={e => {
-          // Click on empty space → deselect
           if ((e.target as HTMLElement).classList.contains('segments-area')) {
             onSelectSegment(null)
           }
         }}
       >
+        {filmstrip}
         {segmentBlocks}
       </div>
 
-      {/* ── Playhead ── */}
-      {duration > 0 && (
+      {playheadX != null && (
         <div className="playhead" style={{ left: playheadX }}>
           <div className="playhead-head" />
           <div className="playhead-line" />
