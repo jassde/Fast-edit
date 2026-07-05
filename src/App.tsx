@@ -1,3 +1,4 @@
+@ -1,613 +1,613 @@
 import "./App.css";
 import { useRef, useCallback, useEffect, useState, useMemo } from "react";
 import { defaultZoomForDuration, loadBool, saveBool, sourceToKept } from "./utils";
@@ -35,6 +36,7 @@ export default function App() {
 
   const [sidebarExpanded, setSidebarExpanded] = useState(() =>
     loadBool("sidebar-expanded", false),
+    loadBool("sidebar-expanded", true),
   );
   const toggleSidebar = useCallback(() => {
     setSidebarExpanded((prev) => {
