@@ -5,13 +5,12 @@ type SidebarProps = {
   showScrollPanel: boolean
   /** Export button is enabled only when segments exist and a file is loaded. */
   exportEnabled: boolean
-  /** Save button is enabled only when a file is loaded. */
-  saveEnabled: boolean
+  /** Whether a video file is currently loaded. */
+  hasFile: boolean
   onToggle: () => void
   onOpenFile: () => void
   onDownload: () => void
-  onLoadProject: () => void
-  onSaveProject: () => void
+  onLoadSaveProject: () => void
   onToggleScrollPanel: () => void
   onOpenShortcuts: () => void
   onOpenSettings: () => void
@@ -22,12 +21,11 @@ export function Sidebar({
   expanded,
   showScrollPanel,
   exportEnabled,
-  saveEnabled,
+  hasFile,
   onToggle,
   onOpenFile,
   onDownload,
-  onLoadProject,
-  onSaveProject,
+  onLoadSaveProject,
   onToggleScrollPanel,
   onOpenShortcuts,
   onOpenSettings,
@@ -85,28 +83,14 @@ export function Sidebar({
 
       <button
         className="sidebar-btn"
-        title="Load Project"
-        aria-label="Load Project"
-        onClick={onLoadProject}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1" />
-          <path d="M5.5 7a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5" />
-        </svg>
-        <span className="sidebar-btn-label">Load</span>
-      </button>
-
-      <button
-        className="sidebar-btn"
-        title="Save Project"
-        aria-label="Save Project"
-        disabled={!saveEnabled}
-        onClick={onSaveProject}
+        title={hasFile ? "Save Project" : "Load Project"}
+        aria-label={hasFile ? "Save Project" : "Load Project"}
+        onClick={onLoadSaveProject}
       >
         <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
           <path d="M0 1a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm4 0v6h8V1zm8 8H4v6h8zM1 1v2h2V1zm2 3H1v2h2zM1 7v2h2V7zm2 3H1v2h2zm-2 3v2h2v-2zM15 1h-2v2h2zm-2 3v2h2V4zm2 3h-2v2h2zm-2 3v2h2v-2zm2 3h-2v2h2z" />
         </svg>
-        <span className="sidebar-btn-label">Save</span>
+        <span className="sidebar-btn-label">Load/Save</span>
       </button>
 
       <div className="sidebar-sep" />

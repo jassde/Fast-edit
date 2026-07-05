@@ -1,4 +1,3 @@
-@ -1,613 +1,613 @@
 import "./App.css";
 import { useRef, useCallback, useEffect, useState, useMemo } from "react";
 import { defaultZoomForDuration, loadBool, saveBool, sourceToKept } from "./utils";
@@ -202,6 +201,14 @@ export default function App() {
       console.error("Load failed:", e);
     }
   }, [actions]);
+
+  const handleLoadSaveProject = useCallback(() => {
+    if (state.filePath) {
+      handleSaveProject();
+    } else {
+      handleLoadProject();
+    }
+  }, [state.filePath, handleSaveProject, handleLoadProject]);
 
   // Apply the pending seek once mpv reports a duration for the loaded file.
   useEffect(() => {
@@ -449,12 +456,11 @@ export default function App() {
           expanded={sidebarExpanded}
           showScrollPanel={state.showScrollPanel}
           exportEnabled={state.segments.length > 0 && state.duration > 0}
-          saveEnabled={!!state.filePath}
+          hasFile={!!state.filePath}
           onToggle={toggleSidebar}
           onOpenFile={handleOpenFile}
           onDownload={openDownloaderWindow}
-          onLoadProject={handleLoadProject}
-          onSaveProject={handleSaveProject}
+          onLoadSaveProject={handleLoadSaveProject}
           onToggleScrollPanel={() => actions.setShowScrollPanel(!state.showScrollPanel)}
           onOpenShortcuts={() => setShowShortcutsModal(true)}
           onOpenSettings={actions.openSettingsModal}
