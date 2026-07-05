@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { AppState, AppActions } from './useAppState'
-import { clamp } from '../utils'
+import { clamp, sortedByStart, sourceToKept, keptToSource, keptDuration } from '../utils'
 import { DEFAULT_FPS } from '../constants'
 
 type PlaybackCommands = {
@@ -78,7 +78,20 @@ export function useWheelSeek(
       const stepSec = e.shiftKey
         ? sign * s.secondsPerShiftScrollTick
         : sign * s.framesPerScrollTick * (1 / (s.fps || DEFAULT_FPS))
-      const newPos  = clamp(s.playheadPosition + stepSec, 0, s.duration)
+
+      // Step in kept-time space so scrolling past a segment's edge snaps to
+      // the next kept segment instead of landing inside a ripple-deleted gap
+      // (mpv only knows the original, uncut file, so a raw source-time step
+      // could otherwise seek straight into removed footage).
+      const sorted  = sortedByStart(s.segments)
+      const curKept = sorted.length > 0 ? sourceToKept(s.playheadPosition, sorted) : null
+      let newPos: number
+      if (curKept !== null) {
+        const newKept = clamp(curKept + stepSec, 0, keptDuration(sorted))
+        newPos = keptToSource(newKept, sorted)!.sourceT
+      } else {
+        newPos = clamp(s.playheadPosition + stepSec, 0, s.duration)
+      }
 
       p.seek(newPos)
       a.setPlayheadPosition(newPos)

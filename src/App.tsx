@@ -1,6 +1,6 @@
 import "./App.css";
 import { useRef, useCallback, useEffect, useState, useMemo } from "react";
-import { defaultZoomForDuration, loadBool, saveBool } from "./utils";
+import { defaultZoomForDuration, loadBool, saveBool, sourceToKept } from "./utils";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -395,6 +395,22 @@ export default function App() {
     () => [...state.segments].sort((a, b) => a.start - b.start),
     [state.segments],
   );
+
+  // During playback, ripple-deleted segments leave a gap in SOURCE time that
+  // mpv (which only knows the original, uncut file) will happily keep playing
+  // through. Detect when the playhead has drifted into such a gap and jump
+  // straight to the next kept segment — or pause if there isn't one — instead
+  // of letting mpv play the removed footage.
+  useEffect(() => {
+    if (!state.isPlaying || sortedSegments.length === 0) return;
+    if (sourceToKept(state.playheadPosition, sortedSegments) !== null) return;
+    const next = sortedSegments.find((seg) => seg.start > state.playheadPosition);
+    if (next) {
+      handleSeek(next.start);
+    } else {
+      handlePause();
+    }
+  }, [state.isPlaying, state.playheadPosition, sortedSegments, handleSeek, handlePause]);
 
   // Selected segment's 1-based position in start order + total count, for the
   // segment indicator.
