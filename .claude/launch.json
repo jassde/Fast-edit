@@ -5,19 +5,22 @@
       "name": "Tauri — Full app (Rust + React)",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "tauri", "--", "dev"],
-      "port": 1420
+      "port": 1420,
+      "autoPort": true
     },
     {
       "name": "Vite — Frontend only",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 1420
+      "port": 1420,
+      "autoPort": true
     },
     {
       "name": "Vite Preview — Serve production build",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview"],
-      "port": 4173
+      "port": 4173,
+      "autoPort": true
     }
   ]
 }
