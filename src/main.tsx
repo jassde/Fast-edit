@@ -2,6 +2,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import Downloader from "./downloader/Downloader";
 import { ScrollPanelApp } from "./components/ScrollPanelApp";
+import { EffectsPanelApp } from "./components/EffectsPanelApp";
 import {
   ACCENT_COLORS,
   DEFAULT_ACCENT_COLOR,
@@ -18,6 +19,8 @@ if (hash === "downloader") {
   document.documentElement.classList.add("downloader-window");
 } else if (hash === "scroll-panel") {
   document.documentElement.classList.add("scroll-panel-window");
+} else if (hash === "effects-panel") {
+  document.documentElement.classList.add("effects-panel-window");
 }
 
 // Apply the persisted accent color BEFORE React mounts so the first paint
@@ -45,6 +48,7 @@ if (hash === "downloader") {
 function rootComponent() {
   if (hash === "downloader")    return <Downloader />
   if (hash === "scroll-panel")  return <ScrollPanelApp />
+  if (hash === "effects-panel") return <EffectsPanelApp />
   return <App />
 }
 

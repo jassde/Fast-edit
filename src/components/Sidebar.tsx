@@ -3,6 +3,7 @@ import { Clapperboard } from 'lucide-react'
 type SidebarProps = {
   expanded: boolean
   showScrollPanel: boolean
+  showEffectsPanel: boolean
   /** Export button is enabled only when segments exist and a file is loaded. */
   exportEnabled: boolean
   /** Whether a video file is currently loaded. */
@@ -12,6 +13,7 @@ type SidebarProps = {
   onDownload: () => void
   onLoadSaveProject: () => void
   onToggleScrollPanel: () => void
+  onToggleEffectsPanel: () => void
   onOpenShortcuts: () => void
   onOpenSettings: () => void
   onExport: () => void
@@ -20,6 +22,7 @@ type SidebarProps = {
 export function Sidebar({
   expanded,
   showScrollPanel,
+  showEffectsPanel,
   exportEnabled,
   hasFile,
   onToggle,
@@ -27,6 +30,7 @@ export function Sidebar({
   onDownload,
   onLoadSaveProject,
   onToggleScrollPanel,
+  onToggleEffectsPanel,
   onOpenShortcuts,
   onOpenSettings,
   onExport,
@@ -106,6 +110,19 @@ export function Sidebar({
           <path d="M3 5a5 5 0 0 1 10 0v6a5 5 0 0 1-10 0zm5.5-1.5a.5.5 0 0 0-1 0v2a.5.5 0 0 0 1 0z" />
         </svg>
         <span className="sidebar-btn-label">Scroll</span>
+      </button>
+
+      <button
+        className="sidebar-btn"
+        title="Effects"
+        aria-label="Effects"
+        aria-pressed={showEffectsPanel}
+        onClick={onToggleEffectsPanel}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 1a.5.5 0 0 1 .5.5v.793l.854-.854a.5.5 0 1 1 .707.707L8.5 3.707V5.5a.5.5 0 0 1-1 0V3.707L5.94 2.146a.5.5 0 1 1 .707-.707L7.5 2.293V1.5A.5.5 0 0 1 8 1M3.5 6.5A.5.5 0 0 1 4 7v1h1a.5.5 0 0 1 0 1H4v1a.5.5 0 0 1-1 0V9H2a.5.5 0 0 1 0-1h1V7a.5.5 0 0 1 .5-.5m9 0a.5.5 0 0 1 .5.5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0V9h-1a.5.5 0 0 1 0-1h1V7a.5.5 0 0 1 .5-.5M8 11a.5.5 0 0 1 .5.5v.793l.854-.854a.5.5 0 1 1 .707.707l-.854.854H10.5a.5.5 0 0 1 0 1H9.207l.854.854a.5.5 0 1 1-.707.707L8.5 14.707V15.5a.5.5 0 0 1-1 0v-.793l-.854.854a.5.5 0 1 1-.707-.707l.854-.854H5.5a.5.5 0 0 1 0-1h1.293l-.854-.854a.5.5 0 1 1 .707-.707l.854.854V11.5A.5.5 0 0 1 8 11" />
+        </svg>
+        <span className="sidebar-btn-label">Effects</span>
       </button>
 
       <button

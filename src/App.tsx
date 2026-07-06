@@ -45,6 +45,8 @@ export default function App() {
     });
   }, []);
 
+  const [showEffectsPanel, setShowEffectsPanel] = useState(false);
+
   // Keep <html data-accent="..."> in sync with the persisted accent. main.tsx
   // sets the initial value pre-mount; this catches changes from the Settings
   // modal at runtime. Each window owns its own document — the downloader and
@@ -303,6 +305,36 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.showScrollPanel, actions]);
 
+  useEffect(() => {
+    if (!showEffectsPanel) {
+      WebviewWindow.getByLabel("effects-panel").then((win) => win?.close());
+      return;
+    }
+
+    WebviewWindow.getByLabel("effects-panel").then((existing) => {
+      if (existing) return;
+
+      const win = new WebviewWindow("effects-panel", {
+        url: "index.html#effects-panel",
+        title: "Effects",
+        decorations: false,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        width: 260,
+        height: 300,
+        resizable: false,
+      });
+
+      win.once("tauri://error", (e) => {
+        console.error("Effects-panel window error:", e);
+      });
+
+      win.once("tauri://destroyed", () => {
+        setShowEffectsPanel(false);
+      });
+    });
+  }, [showEffectsPanel]);
+
   // Open the downloader as a separate Tauri window; focus it if already open
   const openDownloaderWindow = useCallback(async () => {
     const existing = await WebviewWindow.getByLabel("downloader");
@@ -455,6 +487,7 @@ export default function App() {
         <Sidebar
           expanded={sidebarExpanded}
           showScrollPanel={state.showScrollPanel}
+          showEffectsPanel={showEffectsPanel}
           exportEnabled={state.segments.length > 0 && state.duration > 0}
           hasFile={!!state.filePath}
           onToggle={toggleSidebar}
@@ -462,6 +495,7 @@ export default function App() {
           onDownload={openDownloaderWindow}
           onLoadSaveProject={handleLoadSaveProject}
           onToggleScrollPanel={() => actions.setShowScrollPanel(!state.showScrollPanel)}
+          onToggleEffectsPanel={() => setShowEffectsPanel(!showEffectsPanel)}
           onOpenShortcuts={() => setShowShortcutsModal(true)}
           onOpenSettings={actions.openSettingsModal}
           onExport={actions.openExportModal}

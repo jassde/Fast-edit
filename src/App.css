@@ -674,6 +674,29 @@ body,
     overflow: auto;
 }
 
+/* ── Effects-panel window ────────────────────────────────────────────────── */
+.effects-panel-window,
+.effects-panel-window body,
+.effects-panel-window #root {
+    background: var(--bg-toolbar);
+}
+.effects-panel-window #root {
+    height: 300px;
+}
+.effects-panel-window .effects-panel-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    user-select: none;
+}
+.effects-panel-window .float-panel-body {
+    flex: 1;
+    overflow: auto;
+}
+
 /* ── Timeline strip ──────────────────────────────────────────────────────── */
 .timeline-strip {
     height: 116px;
