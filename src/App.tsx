@@ -368,8 +368,10 @@ export default function App() {
           setEffScale(e.payload.value!);
         } else {
           playback.resetPlacement();
+          playback.setSpeed(1);
           panRef.current = { x: 0, y: 0 };
           setEffScale(1);
+          setEffSpeed(1);
         }
       },
     ).then((ul) => {

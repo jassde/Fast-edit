@@ -1,18 +1,17 @@
 import {
   SEGMENT_COLORS,
-  MIN_TIMELINE_ZOOM,
-  MAX_TIMELINE_ZOOM,
-  DEFAULT_TARGET_VISIBLE_SECONDS,
+  DEFAULT_LOAD_ZOOM,
 } from './constants'
 import type { Segment } from './types'
 
 /** Format seconds to HH:MM:SS.mmm */
 export function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) seconds = 0
-  const h  = Math.floor(seconds / 3600)
-  const m  = Math.floor((seconds % 3600) / 60)
-  const s  = Math.floor(seconds % 60)
-  const ms = Math.round((seconds % 1) * 1000)
+  const totalMs = Math.round(seconds * 1000)
+  const h  = Math.floor(totalMs / 3_600_000)
+  const m  = Math.floor((totalMs % 3_600_000) / 60_000)
+  const s  = Math.floor((totalMs % 60_000) / 1000)
+  const ms = totalMs % 1000
   return (
     String(h).padStart(2, '0') + ':' +
     String(m).padStart(2, '0') + ':' +
@@ -27,16 +26,12 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Default timeline zoom for a freshly-loaded video. Targets a visible window
- * of `DEFAULT_TARGET_VISIBLE_SECONDS` seconds, clamped to slider bounds. So a
- * 10s clip stays at 1x (full view), a 10min file opens at 10x, and a 2hr file
- * opens at 120x. Returns 1 (no zoom) if duration isn't known yet.
+ * Default timeline zoom for a freshly-loaded video. Always returns
+ * DEFAULT_LOAD_ZOOM (0.5) so the timeline starts slightly zoomed out with
+ * breathing room on the right.
  */
-export function defaultZoomForDuration(duration: number): number {
-  if (!isFinite(duration) || duration <= DEFAULT_TARGET_VISIBLE_SECONDS) {
-    return MIN_TIMELINE_ZOOM
-  }
-  return clamp(duration / DEFAULT_TARGET_VISIBLE_SECONDS, MIN_TIMELINE_ZOOM, MAX_TIMELINE_ZOOM)
+export function defaultZoomForDuration(_duration: number): number {
+  return DEFAULT_LOAD_ZOOM
 }
 
 /** Convert pixel offset on timeline to time in seconds */

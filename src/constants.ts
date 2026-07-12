@@ -71,14 +71,6 @@ export const MIN_SEGMENT_DURATION_S = 0.1
 export const MIN_FRAME_GAP_S = 0.033
 
 // ── Timeline zoom ────────────────────────────────────────────────────────────
-// Max raised from the original 50 so 1hr+ videos can still default to a true
-// 60s visible window (e.g. 2hr file → zoom 120). Slider step stays at 0.5 in
-// PlaybackControls, so the dynamic range is large enough to be useful but the
-// slider is still draggable smoothly.
-export const MIN_TIMELINE_ZOOM = 1
-export const MAX_TIMELINE_ZOOM = 500
-
-// On file load, the default zoom is chosen so roughly this many seconds of the
-// timeline are visible, clamped to [MIN, MAX]. 60s is the common video-editor
-// default — wide enough to see context, tight enough for frame-level edits.
-export const DEFAULT_TARGET_VISIBLE_SECONDS = 15
+export const MIN_TIMELINE_ZOOM = 0.10
+export const MAX_TIMELINE_ZOOM = 3
+export const DEFAULT_LOAD_ZOOM = 1

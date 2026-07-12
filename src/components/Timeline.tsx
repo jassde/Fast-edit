@@ -7,7 +7,7 @@ import {
   sortedByStart,
   sourceToKept,
 } from '../utils'
-import { MIN_SEGMENT_PX, MIN_FRAME_GAP_S } from '../constants'
+import { MIN_SEGMENT_PX, MIN_FRAME_GAP_S, MIN_TIMELINE_ZOOM } from '../constants'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 //
@@ -128,11 +128,11 @@ export function Timeline({
   // every frame while playback crosses the gap. Mutating the ref here is a
   // pure cache of derived values — safe across StrictMode double-invokes.
   const lastViewStartRef = useRef(0)
-  const safeZoom         = Math.max(1, zoom)
+  const safeZoom         = Math.max(MIN_TIMELINE_ZOOM, zoom)
   const visibleDuration  = keptDur > 0 ? keptDur / safeZoom : 0
   const maxViewStart     = Math.max(0, keptDur - visibleDuration)
   let viewStart: number
-  if (keptDur === 0) {
+  if (keptDur === 0 || safeZoom <= 1) {
     viewStart = 0
   } else if (playheadKept != null) {
     viewStart = clamp(playheadKept - visibleDuration / 2, 0, maxViewStart)

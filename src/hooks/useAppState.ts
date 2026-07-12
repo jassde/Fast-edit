@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Segment, HwEncoder, ProjectFile } from '../types'
 import { clamp, newId, pickColor } from '../utils'
 import {
@@ -377,10 +377,13 @@ export function useAppState(): [AppState, AppActions] {
   const setSelectedStart = useCallback((start: number) => {
     setState(s => {
       if (!s.selectedSegmentId) return s
-      const seg = s.segments.find(sg => sg.id === s.selectedSegmentId)
-      if (!seg) return s
-      const clamped = clamp(start, seg.start, seg.end - MIN_FRAME_GAP_S)
-      if (clamped === seg.start) return s   // no-op: don't pollute undo
+      const sorted = [...s.segments].sort((a, b) => a.start - b.start)
+      const idx = sorted.findIndex(sg => sg.id === s.selectedSegmentId)
+      if (idx === -1) return s
+      const seg = sorted[idx]
+      const prevEnd = idx > 0 ? sorted[idx - 1].end : 0
+      const clamped = clamp(start, prevEnd, seg.end - MIN_FRAME_GAP_S)
+      if (clamped === seg.start) return s
       pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
       return {
         ...s,
@@ -394,10 +397,13 @@ export function useAppState(): [AppState, AppActions] {
   const setSelectedEnd = useCallback((end: number) => {
     setState(s => {
       if (!s.selectedSegmentId) return s
-      const seg = s.segments.find(sg => sg.id === s.selectedSegmentId)
-      if (!seg) return s
-      const clamped = clamp(end, seg.start + MIN_FRAME_GAP_S, seg.end)
-      if (clamped === seg.end) return s   // no-op: don't pollute undo
+      const sorted = [...s.segments].sort((a, b) => a.start - b.start)
+      const idx = sorted.findIndex(sg => sg.id === s.selectedSegmentId)
+      if (idx === -1) return s
+      const seg = sorted[idx]
+      const nextStart = idx < sorted.length - 1 ? sorted[idx + 1].start : s.duration
+      const clamped = clamp(end, seg.start + MIN_FRAME_GAP_S, nextStart)
+      if (clamped === seg.end) return s
       pushUndo({ segments: s.segments, selectedSegmentId: s.selectedSegmentId })
       return {
         ...s,
@@ -518,45 +524,59 @@ export function useAppState(): [AppState, AppActions] {
     }
   }, [pushUndo])
 
+  // Debounce settings persistence so slider drags don't hammer localStorage
+  // on every mousemove tick. The 300ms window collapses a drag into one write.
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const schedulePersist = useCallback((s: AppState) => {
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current)
+    persistTimerRef.current = setTimeout(() => {
+      persistFromAppState(s)
+      persistTimerRef.current = null
+    }, 300)
+  }, [])
+  useEffect(() => () => {
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current)
+  }, [])
+
   const setFramesPerScrollTick = useCallback((n: number) => {
     setState(s => {
       const next = { ...s, framesPerScrollTick: n }
-      persistFromAppState(next)
+      schedulePersist(next)
       return next
     })
-  }, [])
+  }, [schedulePersist])
 
   const setSecondsPerShiftScrollTick = useCallback((n: number) => {
     setState(s => {
       const next = { ...s, secondsPerShiftScrollTick: n }
-      persistFromAppState(next)
+      schedulePersist(next)
       return next
     })
-  }, [])
+  }, [schedulePersist])
 
   const setHwEncoder = useCallback((e: HwEncoder) => {
     setState(s => {
       const next = { ...s, hwEncoder: e }
-      persistFromAppState(next)
+      schedulePersist(next)
       return next
     })
-  }, [])
+  }, [schedulePersist])
 
   const setShowScrollPanel = useCallback((b: boolean) => {
     setState(s => {
       const next = { ...s, showScrollPanel: b }
-      persistFromAppState(next)
+      schedulePersist(next)
       return next
     })
-  }, [])
+  }, [schedulePersist])
 
   const setAccentColor = useCallback((c: AccentColor) => {
     setState(s => {
       const next = { ...s, accentColor: c }
-      persistFromAppState(next)
+      schedulePersist(next)
       return next
     })
-  }, [])
+  }, [schedulePersist])
 
   const actions: AppActions = useMemo(() => ({
     setFilePath,

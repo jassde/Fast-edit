@@ -276,7 +276,7 @@ export function PlaybackControls({
           className="timeline-zoom-slider"
           min={MIN_TIMELINE_ZOOM}
           max={MAX_TIMELINE_ZOOM}
-          step={0.5}
+          step={0.05}
           value={zoom}
           onChange={(e) => onChangeZoom(Number(e.target.value))}
           disabled={!hasFile}

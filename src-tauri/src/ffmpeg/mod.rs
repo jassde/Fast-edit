@@ -266,8 +266,9 @@ pub fn get_hw_support(state: State<'_, Mutex<FfmpegState>>) -> HwSupport {
         .clone()
 }
 
-/// Extract `count` evenly-spaced thumbnail frames from `file_path`, running all
-/// ffmpeg seeks in parallel so the total wall-clock time is one seek, not N.
+/// Extract `count` evenly-spaced thumbnail frames from `file_path`, running
+/// ffmpeg seeks in batches of `MAX_THUMB_WORKERS` so we don't overwhelm the
+/// system with dozens of concurrent ffmpeg subprocesses.
 fn extract_thumbnails_sync(
     ffmpeg_path: &Path,
     file_path: &str,
@@ -278,6 +279,8 @@ fn extract_thumbnails_sync(
     use base64::Engine;
     use std::process::Stdio;
     use std::sync::Arc;
+
+    const MAX_THUMB_WORKERS: usize = 6;
 
     if duration <= 0.0 || count == 0 {
         return Ok(vec![]);
@@ -292,47 +295,50 @@ fn extract_thumbnails_sync(
     let file_path   = Arc::new(file_path.to_string());
     let tmp_dir     = Arc::new(tmp_dir);
 
-    // Spawn all seeks in parallel — startup cost overlaps instead of stacking.
-    let handles: Vec<_> = (0..count)
-        .map(|i| {
-            let t           = (i as f64 + 0.5) * duration / count as f64;
-            let ffmpeg_path = Arc::clone(&ffmpeg_path);
-            let file_path   = Arc::clone(&file_path);
-            let tmp_dir     = Arc::clone(&tmp_dir);
-
-            std::thread::spawn(move || {
-                let out_path = tmp_dir.join(format!("thumb_{i:03}.jpg"));
-                let mut cmd  = std::process::Command::new(ffmpeg_path.as_ref());
-                cmd.args([
-                    "-y",
-                    "-ss", &format!("{t:.3}"),
-                    "-i", file_path.as_str(),
-                    "-vframes", "1",
-                    "-vf", "scale=160:-2",
-                    "-q:v", "5",
-                    "-an",
-                ])
-                .arg(out_path.as_os_str())
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null());
-                process::hide_console(&mut cmd);
-
-                let ok = cmd.status().map(|s| s.success()).unwrap_or(false);
-                if ok {
-                    if let Ok(bytes) = std::fs::read(&out_path) {
-                        return (i, format!("data:image/jpeg;base64,{}", STANDARD.encode(&bytes)));
-                    }
-                }
-                (i, String::new())
-            })
-        })
-        .collect();
-
     let mut results = vec![String::new(); count];
-    for handle in handles {
-        if let Ok((i, data)) = handle.join() {
-            results[i] = data;
+
+    for batch_start in (0..count).step_by(MAX_THUMB_WORKERS) {
+        let batch_end = (batch_start + MAX_THUMB_WORKERS).min(count);
+        let handles: Vec<_> = (batch_start..batch_end)
+            .map(|i| {
+                let t           = (i as f64 + 0.5) * duration / count as f64;
+                let ffmpeg_path = Arc::clone(&ffmpeg_path);
+                let file_path   = Arc::clone(&file_path);
+                let tmp_dir     = Arc::clone(&tmp_dir);
+
+                std::thread::spawn(move || {
+                    let out_path = tmp_dir.join(format!("thumb_{i:03}.jpg"));
+                    let mut cmd  = std::process::Command::new(ffmpeg_path.as_ref());
+                    cmd.args([
+                        "-y",
+                        "-ss", &format!("{t:.3}"),
+                        "-i", file_path.as_str(),
+                        "-vframes", "1",
+                        "-vf", "scale=160:-2",
+                        "-q:v", "5",
+                        "-an",
+                    ])
+                    .arg(out_path.as_os_str())
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null());
+                    process::hide_console(&mut cmd);
+
+                    let ok = cmd.status().map(|s| s.success()).unwrap_or(false);
+                    if ok {
+                        if let Ok(bytes) = std::fs::read(&out_path) {
+                            return (i, format!("data:image/jpeg;base64,{}", STANDARD.encode(&bytes)));
+                        }
+                    }
+                    (i, String::new())
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            if let Ok((i, data)) = handle.join() {
+                results[i] = data;
+            }
         }
     }
 
