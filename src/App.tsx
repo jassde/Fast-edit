@@ -29,12 +29,14 @@ type ScrollSettingsChangePayload = {
 
 const NO_HW_SUPPORT: HwSupport = { nvenc: false, qsv: false, amf: false };
 
+// Pan drag snaps to center when within this fraction of the panel (≈ katana 0.025).
+const PAN_SNAP = 0.03;
+
 export default function App() {
   const [state, actions] = useAppState();
   const videoPanelRef = useRef<HTMLDivElement>(null);
 
   const [sidebarExpanded, setSidebarExpanded] = useState(() =>
-    loadBool("sidebar-expanded", false),
     loadBool("sidebar-expanded", true),
   );
   const toggleSidebar = useCallback(() => {
@@ -46,6 +48,13 @@ export default function App() {
   }, []);
 
   const [showEffectsPanel, setShowEffectsPanel] = useState(false);
+  // Current effect values — kept so the effects window can be re-seeded on open.
+  const [effScale, setEffScale] = useState(1);
+  const [effSpeed, setEffSpeed] = useState(1);
+  // Live pan (video-pan-x/y, fraction of video size) mutated during panel drag.
+  const panRef = useRef({ x: 0, y: 0 });
+  // Center snap-guide lines shown while dragging the video.
+  const [snapGuide, setSnapGuide] = useState({ x: false, y: false, active: false });
 
   // Keep <html data-accent="..."> in sync with the persisted accent. main.tsx
   // sets the initial value pre-mount; this catches changes from the Settings
@@ -320,9 +329,9 @@ export default function App() {
         decorations: false,
         alwaysOnTop: true,
         skipTaskbar: true,
-        width: 260,
-        height: 300,
-        resizable: false,
+        width: 600,
+        height: 480,
+        resizable: true,
       });
 
       win.once("tauri://error", (e) => {
@@ -332,8 +341,87 @@ export default function App() {
       win.once("tauri://destroyed", () => {
         setShowEffectsPanel(false);
       });
+
+      // Seed the panel with current values once its listener is ready.
+      win.once("tauri://created", () => {
+        emit("effects-settings", { speed: effSpeed, scale: effScale }).catch(() => {});
+      });
     });
+    // effScale/effSpeed intentionally excluded — this effect only manages
+    // window open/close; the seed uses whatever the values are at open time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showEffectsPanel]);
+
+  // Receive slider changes from the effects panel window.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let aborted = false;
+
+    listen<{ kind: "speed" | "scale" | "reset"; value?: number }>(
+      "effects-change",
+      (e) => {
+        if (e.payload.kind === "speed") {
+          playback.setSpeed(e.payload.value!);
+          setEffSpeed(e.payload.value!);
+        } else if (e.payload.kind === "scale") {
+          playback.setScale(e.payload.value!);
+          setEffScale(e.payload.value!);
+        } else {
+          playback.resetPlacement();
+          panRef.current = { x: 0, y: 0 };
+          setEffScale(1);
+        }
+      },
+    ).then((ul) => {
+      if (aborted) ul();
+      else unlisten = ul;
+    });
+
+    return () => {
+      aborted = true;
+      unlisten?.();
+    };
+  }, [playback]);
+
+  // Drag the video to reposition it (mpv video-pan-x/y), snapping to center.
+  const panDragRef = useRef<{
+    startX: number; startY: number; baseX: number; baseY: number; w: number; h: number;
+  } | null>(null);
+
+  const handleVideoPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!state.filePath) return;
+    const panel = videoPanelRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    panDragRef.current = {
+      startX: e.clientX, startY: e.clientY,
+      baseX: panRef.current.x, baseY: panRef.current.y,
+      w: r.width, h: r.height,
+    };
+    panel.setPointerCapture(e.pointerId);
+    setSnapGuide((g) => ({ ...g, active: true }));
+  }, [state.filePath]);
+
+  const handleVideoPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = panDragRef.current;
+    if (!d || d.w === 0 || d.h === 0) return;
+    let x = d.baseX + (e.clientX - d.startX) / d.w;
+    let y = d.baseY + (e.clientY - d.startY) / d.h;
+    const snapX = Math.abs(x) < PAN_SNAP;
+    const snapY = Math.abs(y) < PAN_SNAP;
+    if (snapX) x = 0;
+    if (snapY) y = 0;
+    panRef.current = { x, y };
+    playback.setPan(x, y);
+    setSnapGuide({ x: snapX, y: snapY, active: true });
+  }, [playback]);
+
+  const handleVideoPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panDragRef.current) return;
+    panDragRef.current = null;
+    videoPanelRef.current?.releasePointerCapture(e.pointerId);
+    setSnapGuide({ x: false, y: false, active: false });
+  }, []);
 
   // Open the downloader as a separate Tauri window; focus it if already open
   const openDownloaderWindow = useCallback(async () => {
@@ -508,10 +596,20 @@ export default function App() {
             this rect by setVideoMarginRatio (see useMpv.ts). The banners below
             provide an opaque background when no file is loaded or mpv errored. */}
           <div
-            className={`video-panel${isDragOver ? " drag-over" : ""}`}
+            className={`video-panel${isDragOver ? " drag-over" : ""}${state.filePath ? " pannable" : ""}`}
             id="video-panel"
             ref={videoPanelRef}
+            onPointerDown={handleVideoPointerDown}
+            onPointerMove={handleVideoPointerMove}
+            onPointerUp={handleVideoPointerUp}
+            onPointerCancel={handleVideoPointerUp}
           >
+            {snapGuide.active && snapGuide.x && (
+              <div className="video-guide video-guide--v" aria-hidden="true" />
+            )}
+            {snapGuide.active && snapGuide.y && (
+              <div className="video-guide video-guide--h" aria-hidden="true" />
+            )}
             {state.mpvError && (
               <div className="video-banner video-banner--error">
                 <span style={{ whiteSpace: "pre-wrap" }}>{state.mpvError}</span>

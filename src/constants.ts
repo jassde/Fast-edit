@@ -81,4 +81,4 @@ export const MAX_TIMELINE_ZOOM = 500
 // On file load, the default zoom is chosen so roughly this many seconds of the
 // timeline are visible, clamped to [MIN, MAX]. 60s is the common video-editor
 // default — wide enough to see context, tight enough for frame-level edits.
-export const DEFAULT_TARGET_VISIBLE_SECONDS = 60
+export const DEFAULT_TARGET_VISIBLE_SECONDS = 15
