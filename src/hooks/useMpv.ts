@@ -21,7 +21,27 @@ const OBSERVED_PROPERTIES = [
   ['eof-reached',  'flag',   'none'],
   ['mute',         'flag'],
   ['container-fps', 'double', 'none'],
+  ['width',        'int64',  'none'],
+  ['height',       'int64',  'none'],
 ] as const satisfies MpvObservableProperty[]
+
+// Build the `video-crop` value (`WxH+x+y`) for a zoom-in of `scale`× panned by
+// (panX, panY), each a fraction in [-1, 1] where 0 is centred and ±1 pins the
+// crop to a frame edge. Crop out the middle `1/scale` of the frame and offset
+// it by the pan fraction; mpv rescales that crop to fill the #video-panel rect.
+// Because the output is the panel-sized crop (not an enlarged frame), it can
+// never paint outside the panel — dragging moves which part of the frame shows,
+// not where the video sits on screen. The pan sign is inverted so the content
+// follows the cursor (drag right → reveal the left of the frame).
+function zoomCrop(w: number, h: number, scale: number, panX: number, panY: number): string {
+  const cw = Math.max(2, Math.round(w / scale))
+  const ch = Math.max(2, Math.round(h / scale))
+  const maxX = w - cw           // total horizontal travel available (px)
+  const maxY = h - ch
+  const cx = Math.min(maxX, Math.max(0, Math.round((maxX / 2) * (1 - panX))))
+  const cy = Math.min(maxY, Math.max(0, Math.round((maxY / 2) * (1 - panY))))
+  return `${cw}x${ch}+${cx}+${cy}`
+}
 
 const MPV_CONFIG: MpvConfig = {
   initialOptions: {
@@ -57,6 +77,14 @@ export function useMpv(
   // changes (mirrors the pattern used in useKeyboard).
   const actionsRef = useRef(actions)
   actionsRef.current = actions
+
+  // Current video pixel size and applied scale — read by setScale (which needs
+  // real dimensions to compute the centred crop) and re-applied whenever the
+  // dimensions change (new file / aspect switch), since the crop is in pixels.
+  const dimsRef  = useRef({ w: 0, h: 0 })
+  const scaleRef = useRef(1)
+  const panRef   = useRef({ x: 0, y: 0 })
+  const applyPlacementRef = useRef<() => void>(() => {})
 
   // ── Pending-seek guard ────────────────────────────────────────────────
   // When we issue a `seek`, mpv may take a while to process it — especially
@@ -141,6 +169,12 @@ export function useMpv(
               break
             case 'container-fps':
               if (data && data > 0) a.setFps(data)
+              break
+            case 'width':
+              if (data && data > 0) { dimsRef.current.w = data; applyPlacementRef.current() }
+              break
+            case 'height':
+              if (data && data > 0) { dimsRef.current.h = data; applyPlacementRef.current() }
               break
           }
         })
@@ -232,9 +266,47 @@ export function useMpv(
   const frameStep     = useCallback(() => { command('frame-step').catch(console.error) }, [])
   const frameBackStep = useCallback(() => { command('frame-back-step').catch(console.error) }, [])
   const setMute       = useCallback((muted: boolean) => { setProperty('mute', muted).catch(console.error) }, [])
+  const setSpeed      = useCallback((v: number) => { setProperty('speed', v).catch(console.error) }, [])
+  // Apply the current scale + pan (from refs) without letting the video spill
+  // outside the #video-panel rect.
+  //   scale > 1 (zoom in): use `video-crop` — crop a `1/scale` window of the
+  //     frame, offset by the pan fraction, and let mpv rescale that crop to fill
+  //     the panel. The output is panel-sized, so it can never paint over the
+  //     surrounding UI, and dragging pans within the frame instead of moving the
+  //     whole video off-panel (which is what video-pan-x/y did).
+  //   scale ≤ 1 (shrink / 1:1): `video-zoom` (log2 scale) keeps the video inside
+  //     the panel; there's no hidden frame to pan into, so pan is a no-op.
+  const applyPlacement = useCallback(() => {
+    const { w, h } = dimsRef.current
+    const scale = scaleRef.current
+    if (scale > 1 && w > 0 && h > 0) {
+      setProperty('video-zoom', 0).catch(console.error)
+      setProperty('video-crop', zoomCrop(w, h, scale, panRef.current.x, panRef.current.y)).catch(console.error)
+    } else {
+      setProperty('video-crop', '').catch(console.error)
+      setProperty('video-zoom', Math.log2(scale)).catch(console.error)
+    }
+  }, [])
+  applyPlacementRef.current = applyPlacement
+  const setScale      = useCallback((scale: number) => {
+    scaleRef.current = scale
+    applyPlacement()
+  }, [applyPlacement])
+  const setPan        = useCallback((x: number, y: number) => {
+    panRef.current = { x, y }
+    applyPlacement()
+  }, [applyPlacement])
+  const resetPlacement = useCallback(() => {
+    scaleRef.current = 1
+    panRef.current = { x: 0, y: 0 }
+    setProperty('video-crop', '').catch(console.error)
+    setProperty('video-zoom',  0).catch(console.error)
+    setProperty('video-pan-x', 0).catch(console.error)
+    setProperty('video-pan-y', 0).catch(console.error)
+  }, [])
 
   return useMemo(
-    () => ({ play, pause, seek, frameStep, frameBackStep, setMute }),
-    [play, pause, seek, frameStep, frameBackStep, setMute],
+    () => ({ play, pause, seek, frameStep, frameBackStep, setMute, setSpeed, setScale, setPan, resetPlacement }),
+    [play, pause, seek, frameStep, frameBackStep, setMute, setSpeed, setScale, setPan, resetPlacement],
   )
 }

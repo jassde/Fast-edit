@@ -1,6 +1,6 @@
 import "./App.css";
 import { useRef, useCallback, useEffect, useState, useMemo } from "react";
-import { defaultZoomForDuration, loadBool, saveBool } from "./utils";
+import { defaultZoomForDuration, loadBool, saveBool, sourceToKept } from "./utils";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -14,8 +14,9 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useWheelSeek } from "./hooks/useWheelSeek";
 import { HwSupport, ProjectFile } from "./types";
 
-import { Clapperboard, Film } from "lucide-react";
+import { Film } from "lucide-react";
 import { PlaybackControls } from "./components/PlaybackControls";
+import { Sidebar } from "./components/Sidebar";
 import { Timeline } from "./components/Timeline";
 import { ExportModal } from "./components/ExportModal";
 import { SettingsModal } from "./components/SettingsModal";
@@ -28,12 +29,15 @@ type ScrollSettingsChangePayload = {
 
 const NO_HW_SUPPORT: HwSupport = { nvenc: false, qsv: false, amf: false };
 
+// Pan drag snaps to center when within this fraction of the panel (≈ katana 0.025).
+const PAN_SNAP = 0.03;
+
 export default function App() {
   const [state, actions] = useAppState();
   const videoPanelRef = useRef<HTMLDivElement>(null);
 
   const [sidebarExpanded, setSidebarExpanded] = useState(() =>
-    loadBool("sidebar-expanded", false),
+    loadBool("sidebar-expanded", true),
   );
   const toggleSidebar = useCallback(() => {
     setSidebarExpanded((prev) => {
@@ -42,6 +46,15 @@ export default function App() {
       return next;
     });
   }, []);
+
+  const [showEffectsPanel, setShowEffectsPanel] = useState(false);
+  // Current effect values — kept so the effects window can be re-seeded on open.
+  const [effScale, setEffScale] = useState(1);
+  const [effSpeed, setEffSpeed] = useState(1);
+  // Live pan (video-pan-x/y, fraction of video size) mutated during panel drag.
+  const panRef = useRef({ x: 0, y: 0 });
+  // Center snap-guide lines shown while dragging the video.
+  const [snapGuide, setSnapGuide] = useState({ x: false, y: false, active: false });
 
   // Keep <html data-accent="..."> in sync with the persisted accent. main.tsx
   // sets the initial value pre-mount; this catches changes from the Settings
@@ -200,6 +213,14 @@ export default function App() {
     }
   }, [actions]);
 
+  const handleLoadSaveProject = useCallback(() => {
+    if (state.filePath) {
+      handleSaveProject();
+    } else {
+      handleLoadProject();
+    }
+  }, [state.filePath, handleSaveProject, handleLoadProject]);
+
   // Apply the pending seek once mpv reports a duration for the loaded file.
   useEffect(() => {
     if (pendingSeekRef.current === null || state.duration <= 0) return;
@@ -293,6 +314,117 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.showScrollPanel, actions]);
 
+  useEffect(() => {
+    if (!showEffectsPanel) {
+      WebviewWindow.getByLabel("effects-panel").then((win) => win?.close());
+      return;
+    }
+
+    WebviewWindow.getByLabel("effects-panel").then((existing) => {
+      if (existing) return;
+
+      const win = new WebviewWindow("effects-panel", {
+        url: "index.html#effects-panel",
+        title: "Effects",
+        decorations: false,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        width: 600,
+        height: 480,
+        resizable: true,
+      });
+
+      win.once("tauri://error", (e) => {
+        console.error("Effects-panel window error:", e);
+      });
+
+      win.once("tauri://destroyed", () => {
+        setShowEffectsPanel(false);
+      });
+
+      // Seed the panel with current values once its listener is ready.
+      win.once("tauri://created", () => {
+        emit("effects-settings", { speed: effSpeed, scale: effScale }).catch(() => {});
+      });
+    });
+    // effScale/effSpeed intentionally excluded — this effect only manages
+    // window open/close; the seed uses whatever the values are at open time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEffectsPanel]);
+
+  // Receive slider changes from the effects panel window.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let aborted = false;
+
+    listen<{ kind: "speed" | "scale" | "reset"; value?: number }>(
+      "effects-change",
+      (e) => {
+        if (e.payload.kind === "speed") {
+          playback.setSpeed(e.payload.value!);
+          setEffSpeed(e.payload.value!);
+        } else if (e.payload.kind === "scale") {
+          playback.setScale(e.payload.value!);
+          setEffScale(e.payload.value!);
+        } else {
+          playback.resetPlacement();
+          playback.setSpeed(1);
+          panRef.current = { x: 0, y: 0 };
+          setEffScale(1);
+          setEffSpeed(1);
+        }
+      },
+    ).then((ul) => {
+      if (aborted) ul();
+      else unlisten = ul;
+    });
+
+    return () => {
+      aborted = true;
+      unlisten?.();
+    };
+  }, [playback]);
+
+  // Drag the video to reposition it (mpv video-pan-x/y), snapping to center.
+  const panDragRef = useRef<{
+    startX: number; startY: number; baseX: number; baseY: number; w: number; h: number;
+  } | null>(null);
+
+  const handleVideoPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!state.filePath) return;
+    const panel = videoPanelRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    panDragRef.current = {
+      startX: e.clientX, startY: e.clientY,
+      baseX: panRef.current.x, baseY: panRef.current.y,
+      w: r.width, h: r.height,
+    };
+    panel.setPointerCapture(e.pointerId);
+    setSnapGuide((g) => ({ ...g, active: true }));
+  }, [state.filePath]);
+
+  const handleVideoPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = panDragRef.current;
+    if (!d || d.w === 0 || d.h === 0) return;
+    let x = d.baseX + (e.clientX - d.startX) / d.w;
+    let y = d.baseY + (e.clientY - d.startY) / d.h;
+    const snapX = Math.abs(x) < PAN_SNAP;
+    const snapY = Math.abs(y) < PAN_SNAP;
+    if (snapX) x = 0;
+    if (snapY) y = 0;
+    panRef.current = { x, y };
+    playback.setPan(x, y);
+    setSnapGuide({ x: snapX, y: snapY, active: true });
+  }, [playback]);
+
+  const handleVideoPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panDragRef.current) return;
+    panDragRef.current = null;
+    videoPanelRef.current?.releasePointerCapture(e.pointerId);
+    setSnapGuide({ x: false, y: false, active: false });
+  }, []);
+
   // Open the downloader as a separate Tauri window; focus it if already open
   const openDownloaderWindow = useCallback(async () => {
     const existing = await WebviewWindow.getByLabel("downloader");
@@ -361,11 +493,56 @@ export default function App() {
     setTimelineZoom(defaultZoomForDuration(state.duration));
   }, [state.filePath, state.duration]);
 
+  // On a fresh file load, once mpv reports duration, seed the timeline with
+  // one segment spanning the whole video so it acts as the starting point for
+  // splits. ensureFullSegment is a no-op if segments already exist (e.g. when
+  // a saved project loaded segments), so this is safe to run on every change.
+  useEffect(() => {
+    if (!state.filePath || state.duration <= 0) return;
+    actions.ensureFullSegment();
+  }, [state.filePath, state.duration, actions]);
+
+  // Filmstrip thumbnails — extracted once per file when duration is known.
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const thumbFileRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state.filePath || state.duration <= 0) {
+      if (!state.filePath) thumbFileRef.current = null;
+      return;
+    }
+    if (thumbFileRef.current === state.filePath) return;
+    thumbFileRef.current = state.filePath;
+    setThumbnails([]);
+    invoke<string[]>("generate_thumbnails", {
+      filePath: state.filePath,
+      duration: state.duration,
+      count: 30,
+    })
+      .then(setThumbnails)
+      .catch(() => {});
+  }, [state.filePath, state.duration]);
+
   // Single sorted copy shared by the segment indicator and handleSelectNext.
   const sortedSegments = useMemo(
     () => [...state.segments].sort((a, b) => a.start - b.start),
     [state.segments],
   );
+
+  // During playback, ripple-deleted segments leave a gap in SOURCE time that
+  // mpv (which only knows the original, uncut file) will happily keep playing
+  // through. Detect when the playhead has drifted into such a gap and jump
+  // straight to the next kept segment — or pause if there isn't one — instead
+  // of letting mpv play the removed footage.
+  useEffect(() => {
+    if (!state.isPlaying || sortedSegments.length === 0) return;
+    if (sourceToKept(state.playheadPosition, sortedSegments) !== null) return;
+    const next = sortedSegments.find((seg) => seg.start > state.playheadPosition);
+    if (next) {
+      handleSeek(next.start);
+    } else {
+      handlePause();
+    }
+  }, [state.isPlaying, state.playheadPosition, sortedSegments, handleSeek, handlePause]);
 
   // Selected segment's 1-based position in start order + total count, for the
   // segment indicator.
@@ -397,171 +574,22 @@ export default function App() {
       {/* ── Top row: sidebar + video panel ── */}
       <div className="app-top">
         {/* ── Sidebar ── */}
-        <div className={`sidebar${sidebarExpanded ? " expanded" : ""}`}>
-          <button
-            className="sidebar-toggle"
-            onClick={toggleSidebar}
-            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
-            aria-label={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M6 3l5 5-5 5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-
-          <div className="sidebar-sep" />
-          <div className="sidebar-gap" />
-
-          {/* File I/O — folder icon (open) */}
-          <button
-            className="sidebar-btn"
-            onClick={handleOpenFile}
-            title="Open File"
-            aria-label="Open File"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-            >
-              <path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.826a2 2 0 0 1-1.991-1.819l-.637-7a2 2 0 0 1 .342-1.31zM2.19 4a1 1 0 0 0-.996 1.09l.637 7a1 1 0 0 0 .995.91h10.348a1 1 0 0 0 .995-.91l.637-7A1 1 0 0 0 13.81 4zm4.69-1.707A1 1 0 0 0 6.172 2H2.5a1 1 0 0 0-1 .981l.006.139q.323-.119.684-.12h5.396z" />
-            </svg>
-            <span className="sidebar-btn-label">Open</span>
-          </button>
-
-          <button
-            className="sidebar-btn"
-            title="Download Video"
-            aria-label="Download Video"
-            onClick={openDownloaderWindow}
-          >
-            <svg fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 12l-5-5h3V2h4v5h3L8 12z" />
-              <rect x="2" y="13" width="12" height="1.5" rx="0.75" />
-            </svg>
-            <span className="sidebar-btn-label">Download</span>
-          </button>
-
-          <div className="sidebar-sep" />
-
-          {/* Project save/load — document icon with bookmark to differentiate from folder */}
-          <button
-            className="sidebar-btn"
-            title="Load Project"
-            aria-label="Load Project"
-            onClick={handleLoadProject}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-            >
-              <path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1" />
-              <path d="M5.5 7a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5" />
-            </svg>
-            <span className="sidebar-btn-label">Load</span>
-          </button>
-
-          <button
-            className="sidebar-btn"
-            title="Save Project"
-            aria-label="Save Project"
-            disabled={!state.filePath}
-            onClick={handleSaveProject}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-            >
-              <path d="M0 1a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm4 0v6h8V1zm8 8H4v6h8zM1 1v2h2V1zm2 3H1v2h2zM1 7v2h2V7zm2 3H1v2h2zm-2 3v2h2v-2zM15 1h-2v2h2zm-2 3v2h2V4zm2 3h-2v2h2zm-2 3v2h2v-2zm2 3h-2v2h2z" />
-            </svg>
-            <span className="sidebar-btn-label">Save</span>
-          </button>
-
-          <div className="sidebar-sep" />
-
-          {/* Preferences */}
-          <button
-            className="sidebar-btn"
-            title="Scroll Settings"
-            aria-label="Scroll Settings"
-            aria-pressed={state.showScrollPanel}
-            onClick={() => actions.setShowScrollPanel(!state.showScrollPanel)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-            >
-              <path d="M3 5a5 5 0 0 1 10 0v6a5 5 0 0 1-10 0zm5.5-1.5a.5.5 0 0 0-1 0v2a.5.5 0 0 0 1 0z" />
-            </svg>
-            <span className="sidebar-btn-label">Scroll</span>
-          </button>
-
-          <button
-            className="sidebar-btn"
-            title="Keyboard Shortcuts"
-            aria-label="Keyboard Shortcuts"
-            onClick={() => setShowShortcutsModal(true)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-            >
-              <path d="M14 5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM2 4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-              <path d="M13 10.25a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm0-2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-5 0A.25.25 0 0 1 8.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 8 8.75zm2 0a.25.25 0 0 1 .25-.25h1.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-1.5a.25.25 0 0 1-.25-.25zm1 2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-5-2A.25.25 0 0 1 6.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 6 8.75zm-2 0A.25.25 0 0 1 4.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 4 8.75zm-2 0A.25.25 0 0 1 2.25 8h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 2 8.75zm11-2a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-2 0a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm-2 0A.25.25 0 0 1 9.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 9 6.75zm-2 0A.25.25 0 0 1 7.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 7 6.75zm-2 0A.25.25 0 0 1 5.25 6h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5A.25.25 0 0 1 5 6.75zm-3 0A.25.25 0 0 1 2.25 6h1.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-1.5A.25.25 0 0 1 2 6.75zm0 4a.25.25 0 0 1 .25-.25h.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-.5a.25.25 0 0 1-.25-.25zm2 0a.25.25 0 0 1 .25-.25h5.5a.25.25 0 0 1 .25.25v.5a.25.25 0 0 1-.25.25h-5.5a.25.25 0 0 1-.25-.25z" />
-            </svg>
-            <span className="sidebar-btn-label">Keys</span>
-          </button>
-
-          <button
-            className="sidebar-btn"
-            title="Settings"
-            aria-label="Settings"
-            onClick={actions.openSettingsModal}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-            >
-              <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0" />
-              <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z" />
-            </svg>
-            <span className="sidebar-btn-label">Settings</span>
-          </button>
-
-          <div className="sidebar-spacer" />
-
-          <div className="sidebar-sep" />
-          <div className="sidebar-gap" />
-
-          <button
-            className="sidebar-btn sidebar-btn--export"
-            disabled={state.segments.length === 0 || state.duration === 0}
-            onClick={actions.openExportModal}
-            title="Export Segments"
-            aria-label="Export Segments"
-          >
-            <Clapperboard size={22} />
-            <span className="sidebar-btn-label">Export</span>
-          </button>
-        </div>
+        <Sidebar
+          expanded={sidebarExpanded}
+          showScrollPanel={state.showScrollPanel}
+          showEffectsPanel={showEffectsPanel}
+          exportEnabled={state.segments.length > 0 && state.duration > 0}
+          hasFile={!!state.filePath}
+          onToggle={toggleSidebar}
+          onOpenFile={handleOpenFile}
+          onDownload={openDownloaderWindow}
+          onLoadSaveProject={handleLoadSaveProject}
+          onToggleScrollPanel={() => actions.setShowScrollPanel(!state.showScrollPanel)}
+          onToggleEffectsPanel={() => setShowEffectsPanel(!showEffectsPanel)}
+          onOpenShortcuts={() => setShowShortcutsModal(true)}
+          onOpenSettings={actions.openSettingsModal}
+          onExport={actions.openExportModal}
+        />
 
         {/* ── Video column (fills beside sidebar) ── */}
         <div className="video-column">
@@ -570,10 +598,20 @@ export default function App() {
             this rect by setVideoMarginRatio (see useMpv.ts). The banners below
             provide an opaque background when no file is loaded or mpv errored. */}
           <div
-            className={`video-panel${isDragOver ? " drag-over" : ""}`}
+            className={`video-panel${isDragOver ? " drag-over" : ""}${state.filePath ? " pannable" : ""}`}
             id="video-panel"
             ref={videoPanelRef}
+            onPointerDown={handleVideoPointerDown}
+            onPointerMove={handleVideoPointerMove}
+            onPointerUp={handleVideoPointerUp}
+            onPointerCancel={handleVideoPointerUp}
           >
+            {snapGuide.active && snapGuide.x && (
+              <div className="video-guide video-guide--v" aria-hidden="true" />
+            )}
+            {snapGuide.active && snapGuide.y && (
+              <div className="video-guide video-guide--h" aria-hidden="true" />
+            )}
             {state.mpvError && (
               <div className="video-banner video-banner--error">
                 <span style={{ whiteSpace: "pre-wrap" }}>{state.mpvError}</span>
@@ -642,7 +680,7 @@ export default function App() {
             actions.setSelectedEnd(state.playheadPosition);
           }
         }}
-        onAddSegment={actions.addSegment}
+        onSplit={actions.splitSegment}
         onDeleteSegment={() => {
           if (state.selectedSegmentId) {
             actions.deleteSegment(state.selectedSegmentId);
@@ -661,6 +699,7 @@ export default function App() {
           selectedSegmentId={state.selectedSegmentId}
           playheadPosition={state.playheadPosition}
           zoom={timelineZoom}
+          thumbnails={thumbnails}
           onSeek={handleSeek}
           onSelectSegment={actions.selectSegment}
           onUpdateSegmentStart={actions.setSegmentStart}

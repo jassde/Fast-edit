@@ -16,16 +16,12 @@ pub struct MangofetchState {
     pub temp_dir: PathBuf,
 }
 
-/// Locate `mangofetch` (or `mangofetch.exe` on Windows) on the user's PATH.
+/// Search PATH then `~/.cargo/bin` for `exe`. Returns the first match found.
 ///
-/// Cargo installs it to `~/.cargo/bin`, which is on PATH for any shell that
-/// sourced the cargo env — but a desktop app launched from Explorer may not
-/// see PATH additions made after first login. We fall back to checking
-/// `~/.cargo/bin/mangofetch{.exe}` directly so the app still finds it.
-fn which_mangofetch() -> Option<PathBuf> {
-    let exe = if cfg!(windows) { "mangofetch.exe" } else { "mangofetch" };
-
-    // PATH lookup
+/// Desktop apps launched from Explorer may not inherit PATH additions made
+/// after first login (e.g. `~/.cargo/bin` added by rustup), so the cargo-bin
+/// fallback ensures binaries installed by `cargo install` are still found.
+fn find_exe(exe: &str) -> Option<PathBuf> {
     if let Ok(path) = std::env::var("PATH") {
         for dir in std::env::split_paths(&path) {
             let candidate = dir.join(exe);
@@ -34,16 +30,18 @@ fn which_mangofetch() -> Option<PathBuf> {
             }
         }
     }
-
-    // Cargo default install location
     if let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) {
         let cargo_bin = PathBuf::from(home).join(".cargo").join("bin").join(exe);
         if cargo_bin.is_file() {
             return Some(cargo_bin);
         }
     }
-
     None
+}
+
+fn which_mangofetch() -> Option<PathBuf> {
+    let exe = if cfg!(windows) { "mangofetch.exe" } else { "mangofetch" };
+    find_exe(exe)
 }
 
 pub fn init_state(fast_edit_root: &Path) -> MangofetchState {
@@ -91,19 +89,7 @@ pub enum InstallPhase {
 
 fn cargo_on_path() -> bool {
     let exe = if cfg!(windows) { "cargo.exe" } else { "cargo" };
-    if let Ok(path) = std::env::var("PATH") {
-        for dir in std::env::split_paths(&path) {
-            if dir.join(exe).is_file() {
-                return true;
-            }
-        }
-    }
-    if let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) {
-        if PathBuf::from(home).join(".cargo").join("bin").join(exe).is_file() {
-            return true;
-        }
-    }
-    false
+    find_exe(exe).is_some()
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────
