@@ -1,6 +1,1996 @@
-import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/App.css");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from "/@vite/client"
-const __vite__id = "F:/Downloads/New folder (17)/New folder/edit/src/App.css"
-const __vite__css = "@import url(\"https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap\");\n\n/* ── Reset ───────────────────────────────────────────────────────────────── */\n\n*,\n*::before,\n*::after {\n    box-sizing: border-box;\n    margin: 0;\n    padding: 0;\n}\n\n/* ── Design tokens ───────────────────────────────────────────────────────────\n   Cinema-grade pro tool. Cool-tinted neutrals (very low blue chroma) so the\n   surface reads \"professional NLE\" instead of \"default browser dark\". Warm\n   amber accent provides counterbalance — the one bright thing on screen.   */\n\n:root {\n    /* Cool-tinted dark neutrals — 7 elevation steps, tiny blue chroma (0.004) */\n    --bg-deep: oklch(\n        0.18 0.004 250\n    ); /* page bg, timeline, recessed inputs, pressed */\n    --bg-toolbar: oklch(0.21 0.005 250); /* sidebar, controls bar */\n    --bg-modal: oklch(0.24 0.005 250); /* modal/dialog panel */\n    --bg-chrome: oklch(0.26 0.005 250); /* chrome-bar buttons */\n    --bg-surface: oklch(0.28 0.006 250); /* default buttons */\n    --bg-hover: oklch(0.33 0.007 250); /* hover state */\n    --bg-active: oklch(0.16 0.004 250); /* pressed state */\n\n    --border: oklch(0.31 0.006 250); /* default rule */\n    --border-strong: oklch(0.45 0.008 250); /* selected / focus accent border */\n\n    --text-primary: oklch(0.96 0.002 250);\n    --text-secondary: oklch(0.84 0.003 250);\n    --text-muted: oklch(0.62 0.005 250);\n    --text-faint: oklch(0.42 0.005 250);\n\n    /* Accent — defaults to Red. Per-preset overrides live below under\n       :root[data-accent=\"...\"] selectors. The derived tokens (-soft-bg,\n       -soft-border, -glow, --focus-ring) automatically follow whichever\n       --accent / --accent-hover / --accent-press is active. */\n    --accent: oklch(0.68 0.19 25);\n    --accent-hover: oklch(0.74 0.19 25);\n    --accent-press: oklch(0.6 0.19 25);\n    --accent-soft-bg: color-mix(in oklch, var(--accent) 13%, transparent);\n    --accent-soft-border: color-mix(in oklch, var(--accent) 38%, transparent);\n    --accent-glow: color-mix(in oklch, var(--accent) 32%, transparent);\n\n    --danger: oklch(0.66 0.2 22);\n    --danger-hover: oklch(0.74 0.2 22);\n\n    /* Focus ring */\n    --focus-ring: color-mix(in oklch, var(--accent) 55%, transparent);\n\n    /* Border radii */\n    --radius-sm: 6px;\n    --radius-md: 10px;\n    --radius-lg: 14px;\n\n    /* Motion */\n    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);\n    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);\n\n    /* ── Type scale ─────────────────────────────────────────────────────────\n     2xs → xs → sm → base → md → lg → xl\n     10   11   12.5  13.5   15   17   21    (px)                          */\n    --text-2xs: 10px;\n    --text-xs: 11px;\n    --text-sm: 12.5px;\n    --text-base: 13.5px;\n    --text-md: 15px;\n    --text-lg: 17px;\n    --text-xl: 21px;\n\n    /* Font stacks */\n    --font-sans: \"DM Sans\", \"Helvetica Neue\", system-ui, sans-serif;\n    --font-mono: \"DM Mono\", \"SF Mono\", \"JetBrains Mono\", \"Consolas\", monospace;\n\n    font-family: var(--font-sans);\n    font-size: var(--text-base);\n    font-feature-settings:\n        \"ss01\" on,\n        \"cv11\" on;\n    color: var(--text-primary);\n    -webkit-font-smoothing: antialiased;\n    -moz-osx-font-smoothing: grayscale;\n    line-height: 1.5;\n    text-rendering: optimizeLegibility;\n}\n\n/* ── Accent presets ──────────────────────────────────────────────────────────\n   Each preset overrides the three base accent tokens; everything derived from\n   them (color-mix tokens, focus ring, gradients) follows automatically. */\n\n:root[data-accent=\"red\"] {\n    --accent: oklch(0.68 0.19 25);\n    --accent-hover: oklch(0.74 0.19 25);\n    --accent-press: oklch(0.6 0.19 25);\n}\n\n:root[data-accent=\"gold\"] {\n    --accent: oklch(0.78 0.16 65);\n    --accent-hover: oklch(0.83 0.16 65);\n    --accent-press: oklch(0.68 0.16 65);\n}\n\n:root[data-accent=\"green\"] {\n    --accent: oklch(0.74 0.17 150);\n    --accent-hover: oklch(0.8 0.17 150);\n    --accent-press: oklch(0.66 0.17 150);\n}\n\n:root[data-accent=\"blue\"] {\n    --accent: oklch(0.68 0.16 250);\n    --accent-hover: oklch(0.74 0.15 250);\n    --accent-press: oklch(0.6 0.16 250);\n}\n\n:root[data-accent=\"purple\"] {\n    --accent: oklch(0.65 0.2 310);\n    --accent-hover: oklch(0.71 0.2 310);\n    --accent-press: oklch(0.58 0.2 310);\n}\n\nhtml,\nbody,\n#root {\n    height: 100%;\n    overflow: hidden;\n    background: transparent;\n}\n\n/* ── Global focus ring (keyboard only) ───────────────────────────────────── */\n\n:focus {\n    outline: none;\n}\n\n:focus-visible {\n    outline: 2px solid var(--focus-ring);\n    outline-offset: 2px;\n    border-radius: var(--radius-sm);\n}\n\n/* Custom scrollbars — narrow and subtle */\n\n*::-webkit-scrollbar {\n    width: 10px;\n    height: 10px;\n}\n\n*::-webkit-scrollbar-track {\n    background: transparent;\n}\n\n*::-webkit-scrollbar-thumb {\n    background: var(--bg-hover);\n    border: 2px solid transparent;\n    background-clip: padding-box;\n    border-radius: 999px;\n}\n\n*::-webkit-scrollbar-thumb:hover {\n    background-color: var(--border-strong);\n    background-clip: padding-box;\n}\n\n/* ── App shell ───────────────────────────────────────────────────────────── */\n\n.app-shell {\n    display: grid;\n    grid-template-rows: 1fr auto auto;\n    height: 100%;\n}\n\n.app-top {\n    display: flex;\n    flex-direction: row;\n    min-height: 0;\n    overflow: hidden;\n}\n\n/* ── Sidebar ─────────────────────────────────────────────────────────────── */\n\n.sidebar {\n    width: 0;\n    background: transparent;\n    border-right: none;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    padding: 0;\n    gap: 10px;\n    flex-shrink: 0;\n    position: relative;\n    transition: width 200ms var(--ease-out), background 200ms var(--ease-out), padding 200ms var(--ease-out);\n    overflow: visible;\n}\n\n.sidebar.expanded {\n    width: 138px;\n    background: var(--bg-toolbar);\n    border-right: 1px solid var(--border);\n    padding: 10px 0;\n    overflow-y: auto;\n    overflow-x: hidden;\n}\n\n/* Subtle vertical wash — only when expanded */\n\n.sidebar::before {\n    content: \"\";\n    position: absolute;\n    inset: 0;\n    background: transparent;\n    pointer-events: none;\n    transition: background 200ms var(--ease-out);\n}\n\n.sidebar.expanded::before {\n    background: linear-gradient(\n        180deg,\n        color-mix(in oklch, var(--accent) 3%, transparent) 0%,\n        transparent 25%,\n        transparent 100%\n    );\n}\n\n.sidebar > * {\n    position: relative;\n    z-index: 1;\n}\n\n.sidebar:not(.expanded) .sidebar-btn,\n.sidebar:not(.expanded) .sidebar-sep,\n.sidebar:not(.expanded) .sidebar-gap,\n.sidebar:not(.expanded) .sidebar-spacer {\n    display: none;\n}\n\n.sidebar-btn {\n    width: 40px;\n    height: 40px;\n    border-radius: var(--radius-md);\n    border: 1px solid transparent;\n    background: transparent;\n    color: oklch(1 0 0);\n    cursor: pointer;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    position: relative;\n    transition:\n        background 160ms var(--ease-out),\n        color 160ms var(--ease-out),\n        border-color 160ms var(--ease-out),\n        width 200ms var(--ease-out);\n    flex-shrink: 0;\n}\n\n.expanded .sidebar-btn {\n    width: 116px;\n    justify-content: flex-start;\n    padding-left: 10px;\n    gap: 10px;\n}\n\n.sidebar-btn-label {\n    display: none;\n    font-size: var(--text-xs);\n    font-weight: 500;\n    white-space: nowrap;\n    letter-spacing: -0.01em;\n}\n\n.expanded .sidebar-btn-label {\n    display: inline;\n}\n\n.sidebar-btn svg {\n    width: 30px;\n    height: 30px;\n    fill: currentColor;\n    display: block;\n    transition: transform 220ms var(--ease-spring);\n}\n\n/* Lucide icons are stroke-based — prevent the global fill from overriding them */\n\n.sidebar-btn--export svg {\n    fill: none;\n    stroke: currentColor;\n    stroke-width: 2;\n}\n\n/* Accent rail — slides in from the left on hover, signals \"active region\" */\n\n.sidebar-btn::before {\n    content: \"\";\n    position: absolute;\n    left: -10px;\n    top: 50%;\n    width: 3px;\n    height: 0;\n    border-radius: 0 2px 2px 0;\n    background: var(--accent);\n    transform: translateY(-50%);\n    transition:\n        height 200ms var(--ease-out),\n        opacity 200ms var(--ease-out);\n    opacity: 0;\n}\n\n.sidebar-btn:hover:not(:disabled) {\n    background: var(--bg-hover);\n    color: var(--text-primary);\n}\n\n.sidebar-btn:hover:not(:disabled)::before {\n    height: 30px;\n    opacity: 1;\n}\n\n.sidebar-btn:hover:not(:disabled) svg {\n    transform: scale(1.08);\n}\n\n.sidebar-btn:active:not(:disabled) {\n    background: var(--bg-active);\n}\n\n.sidebar-btn[aria-pressed=\"true\"] {\n    background: var(--bg-active);\n    color: var(--accent);\n    border-color: color-mix(in oklch, var(--accent) 35%, transparent);\n}\n\n.sidebar-btn[aria-pressed=\"true\"]::before {\n    height: 30px;\n    opacity: 1;\n}\n\n.sidebar-btn:disabled {\n    opacity: 0.22;\n    cursor: default;\n}\n\n.sidebar-sep {\n    width: 30px;\n    height: 1px;\n    background: var(--border);\n    margin: 8px 0;\n    flex-shrink: 0;\n}\n\n/* Small fixed gap (used after a divider to separate it from a button) */\n\n.sidebar-gap {\n    height: 4px;\n    flex-shrink: 0;\n}\n\n.sidebar-spacer {\n    height: 105px;\n}\n\n.sidebar-toggle {\n    width: 30px;\n    height: 30px;\n    border-radius: var(--radius-sm);\n    border: none;\n    background: transparent;\n    color: var(--accent);\n    cursor: pointer;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    transition:\n        color 160ms var(--ease-out),\n        background 160ms var(--ease-out);\n    flex-shrink: 0;\n    margin-bottom: 2px;\n    z-index: 10;\n}\n\n.sidebar:not(.expanded) .sidebar-toggle {\n    position: absolute;\n    top: 10px;\n    left: 5px;\n}\n\n.sidebar-toggle:hover {\n    color: var(--text-primary);\n    background: var(--bg-hover);\n}\n\n.sidebar-toggle svg {\n    width: 30px;\n    height: 30px;\n    fill: currentColor;\n    transition: transform 200ms var(--ease-out);\n}\n\n.expanded .sidebar-toggle svg {\n    transform: rotate(180deg);\n}\n\n/* Export — the apex action. Solid accent, slight outer glow, sits at bottom. */\n\n.sidebar-btn--export {\n    background: var(--accent);\n    border-color: var(--accent);\n    color: oklch(0.16 0.004 250);\n    margin-bottom: 2px;\n    box-shadow: 0 3px 16px var(--accent-glow);\n}\n\n.sidebar-btn--export svg {\n    width: 30px;\n    height: 30px;\n}\n\n.sidebar-btn--export:hover:not(:disabled) {\n    background: var(--accent-hover);\n    border-color: var(--accent-hover);\n    color: oklch(0.14 0.004 250);\n    box-shadow: 0 5px 22px var(--accent-glow);\n}\n\n.sidebar-btn--export:hover:not(:disabled)::before {\n    opacity: 0;\n}\n\n.sidebar-btn--export:active:not(:disabled) {\n    background: var(--accent-press);\n    border-color: var(--accent-press);\n    box-shadow: 0 1px 6px var(--accent-glow);\n}\n\n/* ── Video column (fills the top row beside the sidebar) ─────────────────── */\n\n.video-column {\n    flex: 1;\n    display: flex;\n    flex-direction: column;\n    min-width: 0;\n    overflow: hidden;\n}\n\n/* ── Video panel ─────────────────────────────────────────────────────────── */\n\n.video-panel {\n    flex: 1;\n    background: transparent;\n    position: relative;\n    min-height: 200px;\n    overflow: hidden;\n    margin: 10px;\n}\n\n.video-panel.drag-over::after {\n    content: \"\";\n    position: absolute;\n    inset: 10px;\n    border: 1.5px dashed var(--accent);\n    border-radius: 10px;\n    background: var(--accent-soft-bg);\n    pointer-events: none;\n}\n\n/* Drag the video to reposition it (mpv pan). */\n\n.video-panel.pannable {\n    cursor: grab;\n}\n\n.video-panel.pannable:active {\n    cursor: grabbing;\n}\n\n/* Center snap guides shown while dragging the video toward center. */\n\n.video-guide {\n    position: absolute;\n    background: var(--accent);\n    pointer-events: none;\n    z-index: 5;\n}\n\n.video-guide--v {\n    top: 0;\n    bottom: 0;\n    left: 50%;\n    width: 1px;\n    transform: translateX(-50%);\n}\n\n.video-guide--h {\n    left: 0;\n    right: 0;\n    top: 50%;\n    height: 1px;\n    transform: translateY(-50%);\n}\n\n.video-banner {\n    position: absolute;\n    inset: 0;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    justify-content: center;\n    gap: 14px;\n    background:\n        radial-gradient(\n            ellipse 70% 55% at 50% 42%,\n            color-mix(in oklch, var(--accent) 5%, transparent) 0%,\n            transparent 65%\n        ),\n        radial-gradient(\n            ellipse 100% 100% at 50% 100%,\n            color-mix(in oklch, var(--accent) 2%, transparent) 0%,\n            transparent 60%\n        ),\n        var(--bg-deep);\n    padding: 24px;\n    text-align: center;\n}\n\n.video-banner--empty {\n    color: var(--text-secondary);\n    font-size: var(--text-md);\n    font-weight: 500;\n    letter-spacing: -0.005em;\n}\n\n.video-banner--empty .empty-icon {\n    width: 64px;\n    height: 64px;\n    border-radius: 18px;\n    background: linear-gradient(\n        145deg,\n        color-mix(in oklch, var(--accent) 16%, var(--bg-surface)),\n        color-mix(in oklch, var(--bg-surface) 90%, transparent)\n    );\n    border: 1px solid color-mix(in oklch, var(--accent) 24%, var(--border));\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    color: var(--accent);\n    margin-bottom: 6px;\n    box-shadow:\n        0 8px 28px color-mix(in oklch, var(--accent) 14%, transparent),\n        inset 0 1px 0 color-mix(in oklch, var(--text-primary) 6%, transparent);\n}\n\n.video-banner--empty .empty-icon svg {\n    width: 32px;\n    height: 32px;\n}\n\n.video-banner--empty .hint {\n    font-size: var(--text-2xs);\n    margin-top: -2px;\n    color: var(--text-muted);\n    letter-spacing: 0.18em;\n    text-transform: uppercase;\n    font-weight: 600;\n}\n\n.video-banner--error {\n    color: var(--accent);\n    font-size: var(--text-sm);\n}\n\n.video-banner--error a {\n    color: var(--accent);\n    text-decoration: underline;\n}\n\n/* ── Unified control bar ─────────────────────────────────────────────────── */\n\n.playback-controls {\n    height: 58px;\n    width: 100%;\n    background: var(--bg-toolbar);\n    border-top: 1px solid var(--border);\n    border-bottom: 1px solid var(--border);\n    display: grid;\n    grid-template-columns: 1fr auto 1fr;\n    align-items: center;\n    flex-shrink: 0;\n    padding: 0 12px;\n    position: relative;\n}\n\n/* Hairline highlight on top edge — adds that \"tactile metal\" feel */\n\n.playback-controls::before {\n    content: \"\";\n    position: absolute;\n    top: 0;\n    left: 0;\n    right: 0;\n    height: 1px;\n    background: linear-gradient(\n        90deg,\n        transparent 0%,\n        color-mix(in oklch, var(--text-primary) 6%, transparent) 50%,\n        transparent 100%\n    );\n    pointer-events: none;\n}\n\n.pc-group {\n    display: flex;\n    align-items: center;\n    gap: 6px;\n}\n\n.pc-group--left {\n    justify-content: flex-start;\n    gap: 6px;\n    min-width: 0;\n}\n\n.pc-group--center {\n    justify-content: center;\n    gap: 10px;\n}\n\n.pc-group--right {\n    justify-content: flex-end;\n    gap: 6px;\n    min-width: 0;\n}\n\n.pc-sep {\n    width: 1px;\n    height: 24px;\n    background: var(--border);\n    margin: 0 6px;\n    flex-shrink: 0;\n}\n\n.pc-label {\n    font-size: var(--text-2xs);\n    letter-spacing: 0.16em;\n    text-transform: uppercase;\n    color: var(--text-faint);\n    font-weight: 600;\n    white-space: nowrap;\n}\n\n.pc-inout {\n    display: inline-flex;\n    align-items: center;\n    gap: 6px;\n    margin-left: 14px;\n    margin-right: 14px;\n}\n\n/* ── Playback timecode (right end of controls bar) ───────────────────────── */\n\n.pc-timecode {\n    font-variant-numeric: tabular-nums;\n    font-family: var(--font-mono);\n    font-size: var(--text-sm);\n    font-weight: 500;\n    color: var(--text-primary);\n    display: inline-flex;\n    align-items: center;\n    gap: 6px;\n    padding: 5px 12px;\n    background: var(--bg-deep);\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    white-space: nowrap;\n    letter-spacing: 0.02em;\n}\n\n.pc-timecode-sep {\n    color: var(--text-faint);\n}\n\n.pc-timecode-total {\n    color: var(--text-muted);\n    font-weight: 400;\n}\n\n/* ── Timeline zoom slider ─────────────────────────────────────────────────── */\n\n.timeline-zoom-slider {\n    width: 120px;\n    cursor: pointer;\n}\n\n/* ── Floating scroll-step panel ──────────────────────────────────────────── */\n\n.float-panel {\n    position: fixed;\n    z-index: 50;\n    width: 268px;\n    background: var(--bg-toolbar);\n    border: 1px solid var(--border);\n    border-radius: var(--radius-md);\n    box-shadow:\n        0 10px 32px rgba(0, 0, 0, 0.55),\n        0 1px 0 color-mix(in oklch, var(--text-primary) 5%, transparent) inset;\n    user-select: none;\n}\n\n.float-panel-header {\n    display: flex;\n    align-items: center;\n    justify-content: space-between;\n    padding: 7px 10px 7px 14px;\n    border-bottom: 1px solid var(--border);\n    cursor: grab;\n    font-size: var(--text-2xs);\n    color: var(--text-muted);\n    text-transform: uppercase;\n    letter-spacing: 0.14em;\n    font-weight: 600;\n}\n\n.float-panel-header:active {\n    cursor: grabbing;\n}\n\n.float-panel-close {\n    border: none;\n    background: transparent;\n    color: var(--text-muted);\n    cursor: pointer;\n    font-size: 15px;\n    line-height: 1;\n    padding: 0 4px;\n    border-radius: 3px;\n    transition: color 160ms var(--ease-out);\n}\n\n.float-panel-close:hover {\n    color: var(--text-primary);\n}\n\n.float-panel-body {\n    padding: 12px 14px;\n    display: flex;\n    flex-direction: column;\n    gap: 12px;\n}\n\n/* ── Scroll-panel window ─────────────────────────────────────────────────── */\n\n.scroll-panel-window,\n.scroll-panel-window body,\n.scroll-panel-window #root {\n    background: var(--bg-toolbar);\n}\n\n.scroll-panel-window #root {\n    height: 380px;\n}\n\n.scroll-panel-window .scroll-panel-root {\n    height: 100%;\n    display: flex;\n    flex-direction: column;\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    overflow: hidden;\n    user-select: none;\n}\n\n.scroll-panel-window .float-panel-body {\n    flex: 1;\n    overflow: auto;\n}\n\n/* ── Effects-panel window ────────────────────────────────────────────────── */\n\n.effects-panel-window,\n.effects-panel-window body,\n.effects-panel-window #root {\n    background: var(--bg-toolbar);\n}\n\n.effects-panel-window #root {\n    height: 480px;\n}\n\n.effects-panel-window .effects-panel-root {\n    height: 100%;\n    display: flex;\n    flex-direction: column;\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    overflow: hidden;\n    user-select: none;\n}\n\n.effects-panel-window .float-panel-body {\n    flex: 1;\n    overflow: auto;\n    padding: 20px 16px;\n    gap: 16px;\n}\n\n.effects-row-head {\n    display: flex;\n    align-items: center;\n    justify-content: space-between;\n    gap: 8px;\n}\n\n.effects-reset-btn {\n    display: inline-flex;\n    align-items: center;\n    justify-content: center;\n    border: none;\n    background: transparent;\n    color: var(--text-muted);\n    cursor: pointer;\n    padding: 2px;\n    border-radius: 4px;\n    transition: color 160ms var(--ease-out);\n}\n\n.effects-reset-btn:hover {\n    color: var(--text-primary);\n}\n\n/* ── Effects Panel: Premium Slider Cards ─────────────────────────────────── */\n\n.effects-slider-card {\n    box-sizing: border-box;\n    position: relative;\n    background: #1A1B1E;\n    border: 1px solid rgba(58, 59, 65, 0.7);\n    border-radius: 16px;\n    padding: 24px;\n    display: flex;\n    flex-direction: column;\n    gap: 16px;\n}\n\n.effects-slider-header {\n    display: flex;\n    justify-content: space-between;\n    align-items: flex-start;\n    gap: 16px;\n}\n\n.effects-slider-label {\n    font-size: 13px;\n    font-weight: 600;\n    letter-spacing: 1.5px;\n    text-transform: uppercase;\n    color: rgba(255, 255, 255, 0.45);\n    flex: 1;\n}\n\n.effects-slider-value {\n    font-size: 18px;\n    font-weight: 600;\n    color: var(--text-primary);\n    background: rgba(255, 255, 255, 0.05);\n    border: 1px solid rgba(255, 255, 255, 0.1);\n    border-radius: 10px;\n    padding: 8px 16px;\n    white-space: nowrap;\n    min-width: 100px;\n    text-align: center;\n    font-variant-numeric: tabular-nums;\n}\n\n.effects-slider-track {\n    position: relative;\n    height: 36px;\n    display: flex;\n    align-items: center;\n}\n\n.effects-range-input {\n    -webkit-appearance: none;\n    appearance: none;\n    width: 100%;\n    height: 6px;\n    border-radius: 3px;\n    background: linear-gradient(to right, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.3) 100%);\n    outline: none;\n    cursor: pointer;\n}\n\n.effects-range-input::-webkit-slider-thumb {\n    -webkit-appearance: none;\n    appearance: none;\n    width: 24px;\n    height: 24px;\n    border-radius: 50%;\n    background: #3b82f6;\n    cursor: pointer;\n    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);\n    border: none;\n    transition: box-shadow 200ms var(--ease-out);\n}\n\n.effects-range-input::-webkit-slider-thumb:hover {\n    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);\n}\n\n.effects-range-input::-moz-range-thumb {\n    width: 24px;\n    height: 24px;\n    border-radius: 50%;\n    background: #3b82f6;\n    cursor: pointer;\n    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);\n    border: none;\n    transition: box-shadow 200ms var(--ease-out);\n}\n\n.effects-range-input::-moz-range-thumb:hover {\n    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);\n}\n\n.effects-range-input::-webkit-slider-runnable-track {\n    height: 6px;\n    border-radius: 3px;\n}\n\n.effects-range-input::-moz-range-track {\n    background: transparent;\n    border: none;\n}\n\n.effects-range-input::-moz-range-progress {\n    background: #3b82f6;\n    height: 6px;\n    border-radius: 3px;\n}\n\n.effects-slider-bounds {\n    display: flex;\n    justify-content: space-between;\n    font-size: 12px;\n    color: rgba(255, 255, 255, 0.35);\n    padding: 0 2px;\n}\n\n/* ── Timeline strip ──────────────────────────────────────────────────────── */\n\n.timeline-strip {\n    height: 116px;\n    background: var(--bg-deep);\n    border-top: 1px solid var(--border);\n    position: relative;\n    overflow: hidden;\n    flex-shrink: 0;\n}\n\n/* ── Buttons ─────────────────────────────────────────────────────────────── */\n\n.btn {\n    padding: 0 16px;\n    border-radius: var(--radius-sm);\n    border: 1px solid var(--border);\n    background: var(--bg-surface);\n    color: var(--text-primary);\n    cursor: pointer;\n    font-size: var(--text-base);\n    font-family: inherit;\n    font-weight: 500;\n    letter-spacing: -0.005em;\n    transition:\n        background 130ms var(--ease-out),\n        color 130ms var(--ease-out),\n        border-color 130ms var(--ease-out),\n        transform 120ms var(--ease-out),\n        box-shadow 130ms var(--ease-out);\n    user-select: none;\n    white-space: nowrap;\n    display: inline-flex;\n    align-items: center;\n    justify-content: center;\n    gap: 7px;\n    line-height: 1;\n    min-height: 34px;\n}\n\n.btn:hover:not(:disabled) {\n    background: var(--bg-hover);\n    border-color: var(--border-strong);\n}\n\n.btn:active:not(:disabled) {\n    background: var(--bg-active);\n    transform: translateY(0.5px);\n}\n\n.btn:disabled {\n    opacity: 0.26;\n    cursor: default;\n}\n\n/* Primary: solid accent fill. */\n\n.btn-primary {\n    background: var(--accent);\n    border-color: var(--accent);\n    color: oklch(0.14 0.004 250);\n    font-weight: 600;\n}\n\n.btn-primary:hover:not(:disabled) {\n    background: var(--accent-hover);\n    border-color: var(--accent-hover);\n    box-shadow: 0 2px 14px var(--accent-glow);\n}\n\n.btn-primary:active:not(:disabled) {\n    background: var(--accent-press);\n    border-color: var(--accent-press);\n    box-shadow: none;\n}\n\n/* Danger: outlined. */\n\n.btn-danger {\n    background: transparent;\n    border-color: color-mix(in oklch, var(--danger) 60%, transparent);\n    color: var(--danger);\n}\n\n.btn-danger:hover:not(:disabled) {\n    background: color-mix(in oklch, var(--danger) 12%, transparent);\n    border-color: var(--danger);\n    color: var(--danger-hover);\n}\n\n/* Danger icon-only variant */\n\n.btn-danger-icon {\n    color: var(--danger);\n    border-color: var(--border);\n}\n\n.btn-danger-icon:hover:not(:disabled) {\n    background: color-mix(in oklch, var(--danger) 12%, transparent);\n    border-color: color-mix(in oklch, var(--danger) 60%, transparent);\n    color: var(--danger-hover);\n}\n\n/* Icon-only buttons */\n\n.btn-icon {\n    padding: 0 12px;\n    min-width: 34px;\n    min-height: 34px;\n}\n\n/* Segment editing buttons */\n\n.btn-add-delete {\n    min-width: 64px;\n    padding: 0 14px;\n}\n\n.btn-inout {\n    min-width: 52px;\n    padding: 0 14px;\n    font-weight: 600;\n    font-size: var(--text-sm);\n    letter-spacing: 0.05em;\n    text-transform: uppercase;\n}\n\n/* Add segment — dark green fill on hover */\n\n.btn-add-delete:not(.btn-danger-icon):hover:not(:disabled) {\n    background: oklch(0.3 0.08 155);\n    border-color: oklch(0.44 0.12 155);\n    color: oklch(0.82 0.14 155);\n}\n\n.btn-add-delete:not(.btn-danger-icon):active:not(:disabled) {\n    background: oklch(0.24 0.07 155);\n    border-color: oklch(0.4 0.1 155);\n}\n\n/* Delete segment — dark red fill on hover */\n\n.btn-add-delete.btn-danger-icon:hover:not(:disabled) {\n    background: oklch(0.28 0.1 22);\n    border-color: oklch(0.44 0.16 22);\n    color: oklch(0.8 0.18 22);\n}\n\n.btn-add-delete.btn-danger-icon:active:not(:disabled) {\n    background: oklch(0.22 0.08 22);\n    border-color: oklch(0.38 0.14 22);\n}\n\n.btn-wide {\n    min-width: 72px;\n}\n\n/* Large primary play button — the apex transport control */\n\n.btn-play-lg {\n    min-width: 88px !important;\n    min-height: 44px !important;\n    padding: 0 26px !important;\n    border-radius: 22px;\n    box-shadow:\n        0 3px 14px var(--accent-glow),\n        0 0 0 1px color-mix(in oklch, var(--accent) 25%, transparent);\n}\n\n.btn-play-lg:hover:not(:disabled) {\n    box-shadow:\n        0 6px 22px var(--accent-glow),\n        0 0 0 1px color-mix(in oklch, var(--accent-hover) 40%, transparent);\n    transform: translateY(-0.5px);\n}\n\n.btn-play-lg:active:not(:disabled) {\n    transform: translateY(0);\n}\n\n.btn-play-lg svg {\n    width: 18px;\n    height: 18px;\n}\n\n/* Export button (legacy — kept for any usages outside sidebar) */\n\n.btn-export {\n    padding: 0 18px;\n    font-weight: 600;\n    font-size: var(--text-sm);\n    letter-spacing: 0.02em;\n    gap: 7px;\n    min-height: 32px;\n}\n\n.btn-export svg {\n    width: 14px;\n    height: 14px;\n}\n\n/* Chrome-bar buttons (legacy — kept for downloader/modals reuse) */\n\n.btn-chrome {\n    background: var(--bg-chrome);\n    border-color: var(--border);\n    font-size: var(--text-sm);\n    min-height: 30px;\n    padding: 0 13px;\n    border-radius: var(--radius-sm);\n    color: var(--text-secondary);\n}\n\n.btn-chrome:hover:not(:disabled) {\n    background: var(--bg-hover);\n    color: var(--text-primary);\n}\n\n.btn-chrome:active:not(:disabled) {\n    background: var(--bg-active);\n}\n\n/* Inline SVG icons inside buttons */\n\n.btn svg {\n    width: 15px;\n    height: 15px;\n    fill: currentColor;\n    display: block;\n    flex-shrink: 0;\n}\n\n.btn-icon-lg svg {\n    width: 20px;\n    height: 20px;\n}\n\n/* ── Export segment checklist ────────────────────────────────────────────── */\n\n.segment-checklist {\n    display: flex;\n    flex-direction: column;\n    gap: 2px;\n    max-height: 180px;\n    overflow-y: auto;\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    padding: 5px;\n    background: var(--bg-deep);\n}\n\n.segment-checklist-row {\n    display: flex;\n    align-items: center;\n    gap: 9px;\n    font-size: var(--text-sm);\n    padding: 6px 8px;\n    border-radius: 5px;\n    cursor: pointer;\n    transition: background 130ms var(--ease-out);\n}\n\n.segment-checklist-row:hover {\n    background: var(--bg-surface);\n}\n\n.segment-swatch {\n    width: 10px;\n    height: 10px;\n    border-radius: 2px;\n    flex-shrink: 0;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);\n}\n\n.segment-checklist-time {\n    margin-left: auto;\n    font-size: var(--text-xs);\n    color: var(--text-muted);\n    font-family: var(--font-mono);\n    font-variant-numeric: tabular-nums;\n}\n\n/* ── Segment selection indicator ─────────────────────────────────────────── */\n\n.segment-indicator {\n    font-size: var(--text-xs);\n    color: var(--text-muted);\n    font-family: var(--font-mono);\n    font-variant-numeric: tabular-nums;\n    font-weight: 500;\n    white-space: nowrap;\n    padding: 5px 11px;\n    background: var(--bg-deep);\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    min-width: 56px;\n    text-align: center;\n    letter-spacing: 0.04em;\n}\n\n.segment-indicator b {\n    color: var(--accent);\n    font-weight: 600;\n}\n\n/* ── Time display (legacy — used by anyone re-using the chunky readout) ──── */\n\n.time-display {\n    font-variant-numeric: tabular-nums;\n    font-size: var(--text-xl);\n    color: var(--text-primary);\n    font-family: var(--font-mono);\n    font-weight: 400;\n    padding: 7px 18px;\n    background: var(--bg-deep);\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    white-space: nowrap;\n    letter-spacing: -0.02em;\n    display: inline-flex;\n    align-items: center;\n    gap: 8px;\n    min-width: 210px;\n    justify-content: center;\n}\n\n.time-display .total {\n    color: var(--text-faint);\n    font-weight: 400;\n}\n\n.time-display .sep {\n    color: var(--text-faint);\n    opacity: 0.5;\n}\n\n/* ── Timeline component ──────────────────────────────────────────────────── */\n\n.timeline-container {\n    position: relative;\n    width: 100%;\n    height: 116px;\n    overflow: hidden;\n    cursor: default;\n    user-select: none;\n}\n\n.ruler-area {\n    position: absolute;\n    top: 0;\n    left: 0;\n    right: 0;\n    height: 30px;\n    background: var(--bg-toolbar);\n    border-bottom: 1px solid var(--border);\n    cursor: pointer;\n}\n\n.ruler-tick {\n    position: absolute;\n    bottom: 0;\n    width: 1px;\n    height: 6px;\n    background: color-mix(in oklch, var(--text-muted) 75%, transparent);\n    pointer-events: none;\n}\n\n.ruler-tick.major {\n    height: 12px;\n    background: var(--text-secondary);\n}\n\n.ruler-label {\n    position: absolute;\n    top: 5px;\n    font-size: var(--text-xs);\n    color: var(--text-primary);\n    transform: translateX(-50%);\n    white-space: nowrap;\n    pointer-events: none;\n    font-family: var(--font-mono);\n    font-variant-numeric: tabular-nums;\n    font-weight: 500;\n    letter-spacing: 0.03em;\n    opacity: 0.88;\n}\n\n.segments-area {\n    position: absolute;\n    top: 30px;\n    left: 0;\n    right: 0;\n    bottom: 0;\n}\n\n.segment-block {\n    position: absolute;\n    top: 8px;\n    bottom: 8px;\n    border: 1.5px solid;\n    border-radius: var(--radius-sm);\n    min-width: 4px;\n    cursor: pointer;\n    transition:\n        filter 130ms var(--ease-out),\n        box-shadow 160ms var(--ease-out);\n}\n\n/* Snap-close after a trim drag: segments slide from their frozen\n   (gap-revealing) positions to the live cumulative positions. The class is\n   added only for the duration of this transition so zoom and other layout\n   changes stay instant. */\n\n.segment-block.animating-trim-close {\n    transition:\n        left 200ms var(--ease-out),\n        filter 130ms var(--ease-out),\n        box-shadow 160ms var(--ease-out);\n}\n\n.segment-block:hover {\n    filter: brightness(1.18);\n}\n\n.segment-block.selected {\n    filter: brightness(1.4);\n    box-shadow:\n        0 0 0 1.5px rgba(255, 255, 255, 0.18),\n        0 4px 18px rgba(0, 0, 0, 0.55);\n}\n\n.segment-block.tiny {\n    border-width: 1px;\n    border-radius: 2px;\n}\n\n.seg-handle {\n    position: absolute;\n    top: 0;\n    bottom: 0;\n    width: 14px;\n    background: rgba(255, 255, 255, 0.1);\n    cursor: ew-resize;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    gap: 2px;\n    transition: background 150ms var(--ease-out);\n}\n\n.seg-handle:hover {\n    background: rgba(255, 255, 255, 0.28);\n}\n\n.seg-handle-left {\n    left: 0;\n    border-radius: 4px 0 0 4px;\n}\n\n.seg-handle-right {\n    right: 0;\n    border-radius: 0 4px 4px 0;\n}\n\n.seg-handle::before,\n.seg-handle::after {\n    content: \"\";\n    width: 1.5px;\n    height: 48%;\n    background: rgba(255, 255, 255, 0.72);\n    border-radius: 1px;\n}\n\n.playhead {\n    position: absolute;\n    top: 0;\n    bottom: 0;\n    pointer-events: none;\n    z-index: 10;\n}\n\n.playhead-head {\n    width: 0;\n    height: 0;\n    margin-left: -7px;\n    border-left: 7px solid transparent;\n    border-right: 7px solid transparent;\n    border-top: 9px solid var(--accent);\n    filter: drop-shadow(0 1px 4px var(--accent-glow));\n}\n\n.playhead-line {\n    position: absolute;\n    top: 0;\n    bottom: 0;\n    left: 0;\n    width: 1px;\n    background: color-mix(in oklch, var(--accent) 85%, transparent);\n    box-shadow: 0 0 6px var(--accent-glow);\n}\n\n/* ── Filmstrip ───────────────────────────────────────────────────────────── */\n\n.filmstrip {\n    position: absolute;\n    inset: 0;\n    display: flex;\n    overflow: hidden;\n    pointer-events: none;\n}\n\n.filmstrip-frame {\n    flex: none;\n    height: 100%;\n    aspect-ratio: 16 / 9;\n    background-size: cover;\n    background-position: center;\n    opacity: 0.55;\n}\n\n.filmstrip-frame + .filmstrip-frame {\n    border-left: 1px solid rgba(0, 0, 0, 0.25);\n}\n\n/* ── Modals ──────────────────────────────────────────────────────────────── */\n\n.modal-overlay {\n    position: fixed;\n    inset: 0;\n    background: rgba(0, 0, 0, 0.72);\n    backdrop-filter: blur(6px);\n    -webkit-backdrop-filter: blur(6px);\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    z-index: 100;\n    animation: overlay-fade 180ms var(--ease-out);\n}\n\n@keyframes overlay-fade {\n    from {\n        opacity: 0;\n    }\n    to {\n        opacity: 1;\n    }\n}\n\n.modal {\n    background: var(--bg-modal);\n    border: 1px solid var(--border);\n    border-radius: var(--radius-lg);\n    padding: 28px;\n    width: 500px;\n    max-width: 90vw;\n    max-height: 90vh;\n    overflow-y: auto;\n    display: flex;\n    flex-direction: column;\n    gap: 18px;\n    box-shadow:\n        0 24px 64px rgba(0, 0, 0, 0.7),\n        0 0 0 1px color-mix(in oklch, var(--text-primary) 5%, transparent) inset;\n    animation: modal-rise 240ms var(--ease-spring);\n}\n\n@keyframes modal-rise {\n    from {\n        opacity: 0;\n        transform: translateY(8px) scale(0.985);\n    }\n    to {\n        opacity: 1;\n        transform: translateY(0) scale(1);\n    }\n}\n\n.modal-title {\n    font-size: var(--text-lg);\n    font-weight: 600;\n    color: var(--text-primary);\n    letter-spacing: -0.025em;\n}\n\n.modal-field {\n    display: flex;\n    flex-direction: column;\n    gap: 6px;\n}\n\n.modal-label {\n    font-size: var(--text-2xs);\n    color: var(--text-muted);\n    font-weight: 600;\n    text-transform: uppercase;\n    letter-spacing: 0.14em;\n}\n\n.modal-row {\n    display: flex;\n    align-items: center;\n    gap: 8px;\n}\n\n.modal-input,\n.modal-select {\n    padding: 8px 12px;\n    background: var(--bg-deep);\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    color: var(--text-primary);\n    font-size: var(--text-sm);\n    font-family: inherit;\n    transition:\n        border-color 150ms var(--ease-out),\n        box-shadow 150ms var(--ease-out),\n        background 150ms var(--ease-out);\n}\n\n.modal-select {\n    cursor: pointer;\n    padding: 7px 12px;\n}\n\n.modal-input:hover,\n.modal-select:hover {\n    border-color: var(--border-strong);\n}\n\n.modal-input:focus,\n.modal-select:focus {\n    outline: none;\n    border-color: var(--accent);\n    box-shadow: 0 0 0 3px var(--focus-ring);\n    background: var(--bg-active);\n}\n\n.modal-path {\n    font-size: var(--text-xs);\n    color: var(--text-muted);\n    font-family: var(--font-mono);\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;\n    flex: 1;\n}\n\n.modal-radio-group {\n    display: flex;\n    gap: 18px;\n}\n\n.modal-radio-group label {\n    display: flex;\n    align-items: center;\n    gap: 7px;\n    font-size: var(--text-sm);\n    cursor: pointer;\n}\n\n.modal-footer {\n    display: flex;\n    justify-content: flex-end;\n    gap: 8px;\n    padding-top: 12px;\n    border-top: 1px solid var(--border);\n}\n\n.modal-hint {\n    font-size: var(--text-xs);\n    color: var(--text-muted);\n    margin-top: 3px;\n    display: block;\n    line-height: 1.55;\n}\n\n.modal-hint code {\n    font-family: var(--font-mono);\n    background: var(--bg-deep);\n    padding: 1px 5px;\n    border-radius: 3px;\n    font-size: var(--text-2xs);\n}\n\n.shortcuts-table {\n    width: 100%;\n    border-collapse: collapse;\n    margin: 4px 0 8px;\n}\n\n.shortcuts-table td {\n    padding: 7px 4px;\n    border-bottom: 1px solid var(--border);\n    font-size: var(--text-sm);\n}\n\n.shortcuts-table tr:last-child td {\n    border-bottom: none;\n}\n\n.shortcuts-label {\n    color: var(--text-primary);\n}\n\n.shortcuts-key-cell {\n    text-align: right;\n    width: 1%;\n    white-space: nowrap;\n}\n\n.shortcuts-key-btn {\n    font-family: var(--font-mono);\n    background: var(--bg-deep);\n    color: var(--text-primary);\n    border: 1px solid var(--border);\n    padding: 4px 10px;\n    border-radius: 5px;\n    font-size: var(--text-xs);\n    cursor: pointer;\n    min-width: 84px;\n    letter-spacing: 0.03em;\n    transition:\n        border-color 150ms var(--ease-out),\n        color 150ms var(--ease-out);\n}\n\n.shortcuts-key-btn:hover {\n    border-color: var(--accent);\n}\n\n.shortcuts-key-btn.capturing {\n    border-color: var(--accent);\n    color: var(--accent);\n    box-shadow: 0 0 0 3px var(--focus-ring);\n}\n\n.modal-progress {\n    display: flex;\n    flex-direction: column;\n    gap: 9px;\n    padding: 14px 0;\n}\n\n.modal-progress-row {\n    display: flex;\n    justify-content: space-between;\n    font-size: var(--text-xs);\n    color: var(--text-muted);\n    font-variant-numeric: tabular-nums;\n    font-family: var(--font-mono);\n}\n\n.progress-bar-track {\n    width: 100%;\n    height: 6px;\n    background: var(--bg-deep);\n    border-radius: 3px;\n    overflow: hidden;\n    border: 1px solid var(--border);\n}\n\n.progress-bar-fill {\n    height: 100%;\n    background: linear-gradient(90deg, var(--accent), var(--accent-hover));\n    border-radius: 2px;\n    transition: width 200ms var(--ease-out);\n    box-shadow: 0 0 8px var(--accent-glow);\n}\n\n.modal-error {\n    color: var(--accent);\n    font-size: var(--text-xs);\n    background: var(--accent-soft-bg);\n    border: 1px solid var(--accent-soft-border);\n    border-radius: var(--radius-sm);\n    padding: 10px 13px;\n    line-height: 1.5;\n}\n\n/* ── Spinner ─────────────────────────────────────────────────────────────── */\n\n@keyframes spin {\n    to {\n        transform: rotate(360deg);\n    }\n}\n\n.spinner {\n    width: 18px;\n    height: 18px;\n    border: 2px solid var(--border);\n    border-top-color: var(--accent);\n    border-radius: 50%;\n    animation: spin 0.7s linear infinite;\n}\n\n/* ── Settings sliders ────────────────────────────────────────────────────── */\n\n.settings-slider-row {\n    display: flex;\n    align-items: center;\n    gap: 10px;\n    margin-top: 5px;\n}\n\n.settings-slider-bound {\n    font-size: var(--text-xs);\n    color: var(--text-muted);\n    min-width: 24px;\n    text-align: center;\n    font-family: var(--font-mono);\n    font-variant-numeric: tabular-nums;\n}\n\n.settings-slider {\n    flex: 1;\n    accent-color: var(--accent);\n    cursor: pointer;\n}\n\n.crf-marks {\n    display: flex;\n    justify-content: space-between;\n    font-size: var(--text-2xs);\n    color: var(--text-faint);\n    margin-top: 2px;\n    font-family: var(--font-mono);\n    letter-spacing: 0.03em;\n}\n\n/* ── Range input ─────────────────────────────────────────────────────────── */\n\ninput[type=\"range\"] {\n    -webkit-appearance: none;\n    appearance: none;\n    background: transparent;\n}\n\ninput[type=\"range\"]::-webkit-slider-runnable-track {\n    height: 6px;\n    background: var(--bg-deep);\n    border: 1px solid var(--border-strong);\n    border-radius: 3px;\n}\n\ninput[type=\"range\"]::-webkit-slider-thumb {\n    -webkit-appearance: none;\n    appearance: none;\n    width: 16px;\n    height: 16px;\n    margin-top: -6px;\n    background: var(--accent);\n    border: 2px solid var(--bg-toolbar);\n    border-radius: 50%;\n    cursor: pointer;\n    transition:\n        transform 130ms var(--ease-spring),\n        box-shadow 130ms var(--ease-out);\n    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);\n}\n\ninput[type=\"range\"]:hover::-webkit-slider-thumb {\n    transform: scale(1.18);\n    box-shadow: 0 2px 10px var(--accent-glow);\n}\n\ninput[type=\"range\"]:active::-webkit-slider-thumb {\n    transform: scale(1.1);\n}\n\ninput[type=\"range\"]::-moz-range-track {\n    height: 6px;\n    background: var(--bg-deep);\n    border: 1px solid var(--border-strong);\n    border-radius: 3px;\n}\n\ninput[type=\"range\"]::-moz-range-thumb {\n    width: 16px;\n    height: 16px;\n    background: var(--accent);\n    border: 2px solid var(--bg-toolbar);\n    border-radius: 50%;\n    cursor: pointer;\n}\n\n/* ── Empty-state onboarding ─────────────────────────────────────────────── */\n\n.onboarding-steps {\n    display: flex;\n    gap: 8px;\n    margin-top: 20px;\n    align-items: center;\n}\n\n.onboarding-step {\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    gap: 8px;\n    padding: 0 8px;\n}\n\n.onboarding-step-num {\n    width: 26px;\n    height: 26px;\n    border-radius: 50%;\n    border: 1px solid color-mix(in oklch, var(--accent) 35%, var(--border));\n    background: color-mix(in oklch, var(--accent) 10%, var(--bg-deep));\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    font-size: var(--text-xs);\n    font-weight: 700;\n    color: var(--accent);\n    font-family: var(--font-mono);\n}\n\n.onboarding-step-text {\n    font-size: var(--text-xs);\n    color: var(--text-muted);\n    text-align: center;\n    line-height: 1.45;\n    max-width: 92px;\n    font-weight: 500;\n}\n\n.onboarding-step-text kbd {\n    display: inline-block;\n    padding: 1px 5px;\n    background: var(--bg-surface);\n    border: 1px solid var(--border);\n    border-radius: 4px;\n    font-family: var(--font-mono);\n    font-size: var(--text-2xs);\n    color: var(--text-secondary);\n    box-shadow: inset 0 -1px 0\n        color-mix(in oklch, var(--bg-deep) 60%, transparent);\n}\n\n.onboarding-step-connector {\n    width: 24px;\n    height: 1px;\n    background: linear-gradient(\n        90deg,\n        transparent,\n        var(--border) 30%,\n        var(--border) 70%,\n        transparent\n    );\n    margin-bottom: 28px;\n    flex-shrink: 0;\n}\n\n/* ── CRF semantic label ─────────────────────────────────────────────────── */\n\n.crf-quality-label {\n    font-size: var(--text-xs);\n    font-weight: 600;\n    padding: 2px 8px;\n    border-radius: var(--radius-sm);\n    display: inline-block;\n    margin-left: 6px;\n}\n\n/* ── Fast-edit folder row (Settings modal) ───────────────────────────────── */\n\n.fast-edit-root-row {\n    display: flex;\n    flex-direction: row;\n    align-items: center;\n    gap: 8px;\n    margin-top: 4px;\n}\n\n.fast-edit-root-path {\n    flex: 1;\n    min-width: 0;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;\n    padding: 6px 10px;\n    background: var(--bg-deep);\n    border: 1px solid var(--border);\n    border-radius: var(--radius-sm);\n    font-family: var(--font-mono);\n    font-size: var(--text-xs);\n    color: var(--text-secondary);\n}\n\n.modal-hint--error {\n    color: var(--danger);\n}\n\n/* ── Accent color swatches (Settings modal) ──────────────────────────────── */\n\n.modal-divider {\n    height: 1px;\n    background: var(--border);\n    margin: 14px 0 4px;\n    border: 0;\n}\n\n.accent-swatches {\n    display: flex;\n    flex-direction: row;\n    gap: 12px;\n    margin-top: 8px;\n}\n\n.accent-swatch {\n    width: 28px;\n    height: 28px;\n    border-radius: 50%;\n    border: 2px solid transparent;\n    padding: 0;\n    cursor: pointer;\n    background: var(--swatch-color);\n    box-shadow:\n        0 0 0 1px var(--border) inset,\n        0 1px 4px color-mix(in oklch, var(--swatch-color) 35%, transparent);\n    transition:\n        transform 120ms var(--ease-spring),\n        box-shadow 160ms var(--ease-out),\n        border-color 160ms var(--ease-out);\n}\n\n.accent-swatch:hover {\n    transform: scale(1.08);\n    box-shadow:\n        0 0 0 1px var(--border-strong) inset,\n        0 2px 10px color-mix(in oklch, var(--swatch-color) 50%, transparent);\n}\n\n.accent-swatch:focus-visible {\n    outline: none;\n    border-color: var(--text-primary);\n}\n\n.accent-swatch.selected {\n    border-color: var(--text-primary);\n    box-shadow:\n        0 0 0 1px var(--bg-modal) inset,\n        0 2px 12px color-mix(in oklch, var(--swatch-color) 55%, transparent);\n}\n"
-__vite__updateStyle(__vite__id, __vite__css)
-import.meta.hot.accept()
-import.meta.hot.prune(() => __vite__removeStyle(__vite__id))
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap");
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ── Design tokens ───────────────────────────────────────────────────────────
+   Cinema-grade pro tool. Cool-tinted neutrals (very low blue chroma) so the
+   surface reads "professional NLE" instead of "default browser dark". Warm
+   amber accent provides counterbalance — the one bright thing on screen.   */
+
+:root {
+    /* Cool-tinted dark neutrals — 7 elevation steps, tiny blue chroma (0.004) */
+    --bg-deep: oklch(
+        0.18 0.004 250
+    ); /* page bg, timeline, recessed inputs, pressed */
+    --bg-toolbar: oklch(0.21 0.005 250); /* sidebar, controls bar */
+    --bg-modal: oklch(0.24 0.005 250); /* modal/dialog panel */
+    --bg-chrome: oklch(0.26 0.005 250); /* chrome-bar buttons */
+    --bg-surface: oklch(0.28 0.006 250); /* default buttons */
+    --bg-hover: oklch(0.33 0.007 250); /* hover state */
+    --bg-active: oklch(0.16 0.004 250); /* pressed state */
+
+    --border: oklch(0.31 0.006 250); /* default rule */
+    --border-strong: oklch(0.45 0.008 250); /* selected / focus accent border */
+
+    --text-primary: oklch(0.96 0.002 250);
+    --text-secondary: oklch(0.84 0.003 250);
+    --text-muted: oklch(0.62 0.005 250);
+    --text-faint: oklch(0.42 0.005 250);
+
+    /* Accent — defaults to Red. Per-preset overrides live below under
+       :root[data-accent="..."] selectors. The derived tokens (-soft-bg,
+       -soft-border, -glow, --focus-ring) automatically follow whichever
+       --accent / --accent-hover / --accent-press is active. */
+    --accent: oklch(0.68 0.19 25);
+    --accent-hover: oklch(0.74 0.19 25);
+    --accent-press: oklch(0.6 0.19 25);
+    --accent-soft-bg: color-mix(in oklch, var(--accent) 13%, transparent);
+    --accent-soft-border: color-mix(in oklch, var(--accent) 38%, transparent);
+    --accent-glow: color-mix(in oklch, var(--accent) 32%, transparent);
+
+    --danger: oklch(0.66 0.2 22);
+    --danger-hover: oklch(0.74 0.2 22);
+
+    /* Focus ring */
+    --focus-ring: color-mix(in oklch, var(--accent) 55%, transparent);
+
+    /* Border radii */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+
+    /* Motion */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* ── Type scale ─────────────────────────────────────────────────────────
+     2xs → xs → sm → base → md → lg → xl
+     10   11   12.5  13.5   15   17   21    (px)                          */
+    --text-2xs: 10px;
+    --text-xs: 11px;
+    --text-sm: 12.5px;
+    --text-base: 13.5px;
+    --text-md: 15px;
+    --text-lg: 17px;
+    --text-xl: 21px;
+
+    /* Font stacks */
+    --font-sans: "DM Sans", "Helvetica Neue", system-ui, sans-serif;
+    --font-mono: "DM Mono", "SF Mono", "JetBrains Mono", "Consolas", monospace;
+
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-feature-settings:
+        "ss01" on,
+        "cv11" on;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+}
+
+/* ── Accent presets ──────────────────────────────────────────────────────────
+   Each preset overrides the three base accent tokens; everything derived from
+   them (color-mix tokens, focus ring, gradients) follows automatically. */
+
+:root[data-accent="red"] {
+    --accent: oklch(0.68 0.19 25);
+    --accent-hover: oklch(0.74 0.19 25);
+    --accent-press: oklch(0.6 0.19 25);
+}
+
+:root[data-accent="gold"] {
+    --accent: oklch(0.78 0.16 65);
+    --accent-hover: oklch(0.83 0.16 65);
+    --accent-press: oklch(0.68 0.16 65);
+}
+
+:root[data-accent="green"] {
+    --accent: oklch(0.74 0.17 150);
+    --accent-hover: oklch(0.8 0.17 150);
+    --accent-press: oklch(0.66 0.17 150);
+}
+
+:root[data-accent="blue"] {
+    --accent: oklch(0.68 0.16 250);
+    --accent-hover: oklch(0.74 0.15 250);
+    --accent-press: oklch(0.6 0.16 250);
+}
+
+:root[data-accent="purple"] {
+    --accent: oklch(0.65 0.2 310);
+    --accent-hover: oklch(0.71 0.2 310);
+    --accent-press: oklch(0.58 0.2 310);
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+}
+
+/* ── Global focus ring (keyboard only) ───────────────────────────────────── */
+
+:focus {
+    outline: none;
+}
+
+:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* Custom scrollbars — narrow and subtle */
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--bg-hover);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background-color: var(--border-strong);
+    background-clip: padding-box;
+}
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
+
+.app-shell {
+    display: grid;
+    grid-template-rows: 1fr auto auto;
+    height: 100%;
+}
+
+.app-top {
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+
+.sidebar {
+    width: 0;
+    background: transparent;
+    border-right: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
+    gap: 10px;
+    flex-shrink: 0;
+    position: relative;
+    transition: width 200ms var(--ease-out), background 200ms var(--ease-out), padding 200ms var(--ease-out);
+    overflow: visible;
+}
+
+.sidebar.expanded {
+    width: 138px;
+    background: var(--bg-toolbar);
+    border-right: 1px solid var(--border);
+    padding: 10px 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Subtle vertical wash — only when expanded */
+
+.sidebar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    pointer-events: none;
+    transition: background 200ms var(--ease-out);
+}
+
+.sidebar.expanded::before {
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--accent) 3%, transparent) 0%,
+        transparent 25%,
+        transparent 100%
+    );
+}
+
+.sidebar > * {
+    position: relative;
+    z-index: 1;
+}
+
+.sidebar:not(.expanded) .sidebar-btn,
+.sidebar:not(.expanded) .sidebar-sep,
+.sidebar:not(.expanded) .sidebar-gap,
+.sidebar:not(.expanded) .sidebar-spacer {
+    display: none;
+}
+
+.sidebar-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    color: oklch(1 0 0);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition:
+        background 160ms var(--ease-out),
+        color 160ms var(--ease-out),
+        border-color 160ms var(--ease-out),
+        width 200ms var(--ease-out);
+    flex-shrink: 0;
+}
+
+.expanded .sidebar-btn {
+    width: 116px;
+    justify-content: flex-start;
+    padding-left: 10px;
+    gap: 10px;
+}
+
+.sidebar-btn-label {
+    display: none;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+}
+
+.expanded .sidebar-btn-label {
+    display: inline;
+}
+
+.sidebar-btn svg {
+    width: 30px;
+    height: 30px;
+    fill: currentColor;
+    display: block;
+    transition: transform 220ms var(--ease-spring);
+}
+
+/* Lucide icons are stroke-based — prevent the global fill from overriding them */
+
+.sidebar-btn--export svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+/* Accent rail — slides in from the left on hover, signals "active region" */
+
+.sidebar-btn::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    width: 3px;
+    height: 0;
+    border-radius: 0 2px 2px 0;
+    background: var(--accent);
+    transform: translateY(-50%);
+    transition:
+        height 200ms var(--ease-out),
+        opacity 200ms var(--ease-out);
+    opacity: 0;
+}
+
+.sidebar-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.sidebar-btn:hover:not(:disabled)::before {
+    height: 30px;
+    opacity: 1;
+}
+
+.sidebar-btn:hover:not(:disabled) svg {
+    transform: scale(1.08);
+}
+
+.sidebar-btn:active:not(:disabled) {
+    background: var(--bg-active);
+}
+
+.sidebar-btn[aria-pressed="true"] {
+    background: var(--bg-active);
+    color: var(--accent);
+    border-color: color-mix(in oklch, var(--accent) 35%, transparent);
+}
+
+.sidebar-btn[aria-pressed="true"]::before {
+    height: 30px;
+    opacity: 1;
+}
+
+.sidebar-btn:disabled {
+    opacity: 0.22;
+    cursor: default;
+}
+
+.sidebar-sep {
+    width: 30px;
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+    flex-shrink: 0;
+}
+
+/* Small fixed gap (used after a divider to separate it from a button) */
+
+.sidebar-gap {
+    height: 4px;
+    flex-shrink: 0;
+}
+
+.sidebar-spacer {
+    height: 105px;
+}
+
+.sidebar-toggle {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        color 160ms var(--ease-out),
+        background 160ms var(--ease-out);
+    flex-shrink: 0;
+    margin-bottom: 2px;
+    z-index: 10;
+}
+
+.sidebar:not(.expanded) .sidebar-toggle {
+    position: absolute;
+    top: 10px;
+    left: 5px;
+}
+
+.sidebar-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.sidebar-toggle svg {
+    width: 30px;
+    height: 30px;
+    fill: currentColor;
+    transition: transform 200ms var(--ease-out);
+}
+
+.expanded .sidebar-toggle svg {
+    transform: rotate(180deg);
+}
+
+/* Export — the apex action. Solid accent, slight outer glow, sits at bottom. */
+
+.sidebar-btn--export {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: oklch(0.16 0.004 250);
+    margin-bottom: 2px;
+    box-shadow: 0 3px 16px var(--accent-glow);
+}
+
+.sidebar-btn--export svg {
+    width: 30px;
+    height: 30px;
+}
+
+.sidebar-btn--export:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: oklch(0.14 0.004 250);
+    box-shadow: 0 5px 22px var(--accent-glow);
+}
+
+.sidebar-btn--export:hover:not(:disabled)::before {
+    opacity: 0;
+}
+
+.sidebar-btn--export:active:not(:disabled) {
+    background: var(--accent-press);
+    border-color: var(--accent-press);
+    box-shadow: 0 1px 6px var(--accent-glow);
+}
+
+/* ── Video column (fills the top row beside the sidebar) ─────────────────── */
+
+.video-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* ── Video panel ─────────────────────────────────────────────────────────── */
+
+.video-panel {
+    flex: 1;
+    background: transparent;
+    position: relative;
+    min-height: 200px;
+    overflow: hidden;
+    margin: 10px;
+}
+
+.video-panel.drag-over::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border: 1.5px dashed var(--accent);
+    border-radius: 10px;
+    background: var(--accent-soft-bg);
+    pointer-events: none;
+}
+
+/* Drag the video to reposition it (mpv pan). */
+
+.video-panel.pannable {
+    cursor: grab;
+}
+
+.video-panel.pannable:active {
+    cursor: grabbing;
+}
+
+/* Center snap guides shown while dragging the video toward center. */
+
+.video-guide {
+    position: absolute;
+    background: var(--accent);
+    pointer-events: none;
+    z-index: 5;
+}
+
+.video-guide--v {
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+}
+
+.video-guide--h {
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    transform: translateY(-50%);
+}
+
+.video-banner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background:
+        radial-gradient(
+            ellipse 70% 55% at 50% 42%,
+            color-mix(in oklch, var(--accent) 5%, transparent) 0%,
+            transparent 65%
+        ),
+        radial-gradient(
+            ellipse 100% 100% at 50% 100%,
+            color-mix(in oklch, var(--accent) 2%, transparent) 0%,
+            transparent 60%
+        ),
+        var(--bg-deep);
+    padding: 24px;
+    text-align: center;
+}
+
+.video-banner--empty {
+    color: var(--text-secondary);
+    font-size: var(--text-md);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+}
+
+.video-banner--empty .empty-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: linear-gradient(
+        145deg,
+        color-mix(in oklch, var(--accent) 16%, var(--bg-surface)),
+        color-mix(in oklch, var(--bg-surface) 90%, transparent)
+    );
+    border: 1px solid color-mix(in oklch, var(--accent) 24%, var(--border));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    margin-bottom: 6px;
+    box-shadow:
+        0 8px 28px color-mix(in oklch, var(--accent) 14%, transparent),
+        inset 0 1px 0 color-mix(in oklch, var(--text-primary) 6%, transparent);
+}
+
+.video-banner--empty .empty-icon svg {
+    width: 32px;
+    height: 32px;
+}
+
+.video-banner--empty .hint {
+    font-size: var(--text-2xs);
+    margin-top: -2px;
+    color: var(--text-muted);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.video-banner--error {
+    color: var(--accent);
+    font-size: var(--text-sm);
+}
+
+.video-banner--error a {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+/* ── Unified control bar ─────────────────────────────────────────────────── */
+
+.playback-controls {
+    height: 58px;
+    width: 100%;
+    background: var(--bg-toolbar);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0 12px;
+    position: relative;
+}
+
+/* Hairline highlight on top edge — adds that "tactile metal" feel */
+
+.playback-controls::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(in oklch, var(--text-primary) 6%, transparent) 50%,
+        transparent 100%
+    );
+    pointer-events: none;
+}
+
+.pc-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pc-group--left {
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+}
+
+.pc-group--center {
+    justify-content: center;
+    gap: 10px;
+}
+
+.pc-group--right {
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+}
+
+.pc-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    margin: 0 6px;
+    flex-shrink: 0;
+}
+
+.pc-label {
+    font-size: var(--text-2xs);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pc-inout {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 14px;
+    margin-right: 14px;
+}
+
+/* ── Playback timecode (right end of controls bar) ───────────────────────── */
+
+.pc-timecode {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.pc-timecode-sep {
+    color: var(--text-faint);
+}
+
+.pc-timecode-total {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* ── Timeline zoom slider ─────────────────────────────────────────────────── */
+
+.timeline-zoom-slider {
+    width: 120px;
+    cursor: pointer;
+}
+
+/* ── Floating scroll-step panel ──────────────────────────────────────────── */
+
+.float-panel {
+    position: fixed;
+    z-index: 50;
+    width: 268px;
+    background: var(--bg-toolbar);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow:
+        0 10px 32px rgba(0, 0, 0, 0.55),
+        0 1px 0 color-mix(in oklch, var(--text-primary) 5%, transparent) inset;
+    user-select: none;
+}
+
+.float-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px 7px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: grab;
+    font-size: var(--text-2xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+}
+
+.float-panel-header:active {
+    cursor: grabbing;
+}
+
+.float-panel-close {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 4px;
+    border-radius: 3px;
+    transition: color 160ms var(--ease-out);
+}
+
+.float-panel-close:hover {
+    color: var(--text-primary);
+}
+
+.float-panel-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ── Scroll-panel window ─────────────────────────────────────────────────── */
+
+.scroll-panel-window,
+.scroll-panel-window body,
+.scroll-panel-window #root {
+    background: var(--bg-toolbar);
+}
+
+.scroll-panel-window #root {
+    height: 380px;
+}
+
+.scroll-panel-window .scroll-panel-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    user-select: none;
+}
+
+.scroll-panel-window .float-panel-body {
+    flex: 1;
+    overflow: auto;
+}
+
+/* ── Effects-panel window ────────────────────────────────────────────────── */
+
+.effects-panel-window,
+.effects-panel-window body,
+.effects-panel-window #root {
+    background: var(--bg-toolbar);
+}
+
+.effects-panel-window #root {
+    height: 480px;
+}
+
+.effects-panel-window .effects-panel-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    user-select: none;
+}
+
+.effects-panel-window .float-panel-body {
+    flex: 1;
+    overflow: auto;
+    padding: 20px 16px;
+    gap: 16px;
+}
+
+.effects-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.effects-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    transition: color 160ms var(--ease-out);
+}
+
+.effects-reset-btn:hover {
+    color: var(--text-primary);
+}
+
+/* ── Effects Panel: Premium Slider Cards ─────────────────────────────────── */
+
+.effects-slider-card {
+    box-sizing: border-box;
+    position: relative;
+    background: #1A1B1E;
+    border: 1px solid rgba(58, 59, 65, 0.7);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.effects-slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.effects-slider-label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+    flex: 1;
+}
+
+.effects-slider-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 8px 16px;
+    white-space: nowrap;
+    min-width: 100px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.effects-slider-track {
+    position: relative;
+    height: 36px;
+    display: flex;
+    align-items: center;
+}
+
+.effects-range-input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.3) 100%);
+    outline: none;
+    cursor: pointer;
+}
+
+.effects-range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+    border: none;
+    transition: box-shadow 200ms var(--ease-out);
+}
+
+.effects-range-input::-webkit-slider-thumb:hover {
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
+}
+
+.effects-range-input::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+    border: none;
+    transition: box-shadow 200ms var(--ease-out);
+}
+
+.effects-range-input::-moz-range-thumb:hover {
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
+}
+
+.effects-range-input::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 3px;
+}
+
+.effects-range-input::-moz-range-track {
+    background: transparent;
+    border: none;
+}
+
+.effects-range-input::-moz-range-progress {
+    background: #3b82f6;
+    height: 6px;
+    border-radius: 3px;
+}
+
+.effects-slider-bounds {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    padding: 0 2px;
+}
+
+/* ── Timeline strip ──────────────────────────────────────────────────────── */
+
+.timeline-strip {
+    height: 116px;
+    background: var(--bg-deep);
+    border-top: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+    padding: 0 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: var(--text-base);
+    font-family: inherit;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    transition:
+        background 130ms var(--ease-out),
+        color 130ms var(--ease-out),
+        border-color 130ms var(--ease-out),
+        transform 120ms var(--ease-out),
+        box-shadow 130ms var(--ease-out);
+    user-select: none;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    line-height: 1;
+    min-height: 34px;
+}
+
+.btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+}
+
+.btn:active:not(:disabled) {
+    background: var(--bg-active);
+    transform: translateY(0.5px);
+}
+
+.btn:disabled {
+    opacity: 0.26;
+    cursor: default;
+}
+
+/* Primary: solid accent fill. */
+
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: oklch(0.14 0.004 250);
+    font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    box-shadow: 0 2px 14px var(--accent-glow);
+}
+
+.btn-primary:active:not(:disabled) {
+    background: var(--accent-press);
+    border-color: var(--accent-press);
+    box-shadow: none;
+}
+
+/* Danger: outlined. */
+
+.btn-danger {
+    background: transparent;
+    border-color: color-mix(in oklch, var(--danger) 60%, transparent);
+    color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--danger) 12%, transparent);
+    border-color: var(--danger);
+    color: var(--danger-hover);
+}
+
+/* Danger icon-only variant */
+
+.btn-danger-icon {
+    color: var(--danger);
+    border-color: var(--border);
+}
+
+.btn-danger-icon:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--danger) 12%, transparent);
+    border-color: color-mix(in oklch, var(--danger) 60%, transparent);
+    color: var(--danger-hover);
+}
+
+/* Icon-only buttons */
+
+.btn-icon {
+    padding: 0 12px;
+    min-width: 34px;
+    min-height: 34px;
+}
+
+/* Segment editing buttons */
+
+.btn-add-delete {
+    min-width: 64px;
+    padding: 0 14px;
+}
+
+.btn-inout {
+    min-width: 52px;
+    padding: 0 14px;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* Add segment — dark green fill on hover */
+
+.btn-add-delete:not(.btn-danger-icon):hover:not(:disabled) {
+    background: oklch(0.3 0.08 155);
+    border-color: oklch(0.44 0.12 155);
+    color: oklch(0.82 0.14 155);
+}
+
+.btn-add-delete:not(.btn-danger-icon):active:not(:disabled) {
+    background: oklch(0.24 0.07 155);
+    border-color: oklch(0.4 0.1 155);
+}
+
+/* Delete segment — dark red fill on hover */
+
+.btn-add-delete.btn-danger-icon:hover:not(:disabled) {
+    background: oklch(0.28 0.1 22);
+    border-color: oklch(0.44 0.16 22);
+    color: oklch(0.8 0.18 22);
+}
+
+.btn-add-delete.btn-danger-icon:active:not(:disabled) {
+    background: oklch(0.22 0.08 22);
+    border-color: oklch(0.38 0.14 22);
+}
+
+.btn-wide {
+    min-width: 72px;
+}
+
+/* Large primary play button — the apex transport control */
+
+.btn-play-lg {
+    min-width: 88px !important;
+    min-height: 44px !important;
+    padding: 0 26px !important;
+    border-radius: 22px;
+    box-shadow:
+        0 3px 14px var(--accent-glow),
+        0 0 0 1px color-mix(in oklch, var(--accent) 25%, transparent);
+}
+
+.btn-play-lg:hover:not(:disabled) {
+    box-shadow:
+        0 6px 22px var(--accent-glow),
+        0 0 0 1px color-mix(in oklch, var(--accent-hover) 40%, transparent);
+    transform: translateY(-0.5px);
+}
+
+.btn-play-lg:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-play-lg svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Export button (legacy — kept for any usages outside sidebar) */
+
+.btn-export {
+    padding: 0 18px;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    letter-spacing: 0.02em;
+    gap: 7px;
+    min-height: 32px;
+}
+
+.btn-export svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Chrome-bar buttons (legacy — kept for downloader/modals reuse) */
+
+.btn-chrome {
+    background: var(--bg-chrome);
+    border-color: var(--border);
+    font-size: var(--text-sm);
+    min-height: 30px;
+    padding: 0 13px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+}
+
+.btn-chrome:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.btn-chrome:active:not(:disabled) {
+    background: var(--bg-active);
+}
+
+/* Inline SVG icons inside buttons */
+
+.btn svg {
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+    display: block;
+    flex-shrink: 0;
+}
+
+.btn-icon-lg svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ── Export segment checklist ────────────────────────────────────────────── */
+
+.segment-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 5px;
+    background: var(--bg-deep);
+}
+
+.segment-checklist-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: var(--text-sm);
+    padding: 6px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 130ms var(--ease-out);
+}
+
+.segment-checklist-row:hover {
+    background: var(--bg-surface);
+}
+
+.segment-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.segment-checklist-time {
+    margin-left: auto;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Segment selection indicator ─────────────────────────────────────────── */
+
+.segment-indicator {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 5px 11px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    min-width: 56px;
+    text-align: center;
+    letter-spacing: 0.04em;
+}
+
+.segment-indicator b {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ── Time display (legacy — used by anyone re-using the chunky readout) ──── */
+
+.time-display {
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-xl);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-weight: 400;
+    padding: 7px 18px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    letter-spacing: -0.02em;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 210px;
+    justify-content: center;
+}
+
+.time-display .total {
+    color: var(--text-faint);
+    font-weight: 400;
+}
+
+.time-display .sep {
+    color: var(--text-faint);
+    opacity: 0.5;
+}
+
+/* ── Timeline component ──────────────────────────────────────────────────── */
+
+.timeline-container {
+    position: relative;
+    width: 100%;
+    height: 116px;
+    overflow: hidden;
+    cursor: default;
+    user-select: none;
+}
+
+.ruler-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: var(--bg-toolbar);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+}
+
+.ruler-tick {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+    height: 6px;
+    background: color-mix(in oklch, var(--text-muted) 75%, transparent);
+    pointer-events: none;
+}
+
+.ruler-tick.major {
+    height: 12px;
+    background: var(--text-secondary);
+}
+
+.ruler-label {
+    position: absolute;
+    top: 5px;
+    font-size: var(--text-xs);
+    color: var(--text-primary);
+    transform: translateX(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    opacity: 0.88;
+}
+
+.segments-area {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.segment-block {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    border: 1.5px solid;
+    border-radius: var(--radius-sm);
+    min-width: 4px;
+    cursor: pointer;
+    transition:
+        filter 130ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
+}
+
+/* Snap-close after a trim drag: segments slide from their frozen
+   (gap-revealing) positions to the live cumulative positions. The class is
+   added only for the duration of this transition so zoom and other layout
+   changes stay instant. */
+
+.segment-block.animating-trim-close {
+    transition:
+        left 200ms var(--ease-out),
+        filter 130ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
+}
+
+.segment-block:hover {
+    filter: brightness(1.18);
+}
+
+.segment-block.selected {
+    filter: brightness(1.4);
+    box-shadow:
+        0 0 0 1.5px rgba(255, 255, 255, 0.18),
+        0 4px 18px rgba(0, 0, 0, 0.55);
+}
+
+.segment-block.tiny {
+    border-width: 1px;
+    border-radius: 2px;
+}
+
+.seg-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 14px;
+    background: rgba(255, 255, 255, 0.1);
+    cursor: ew-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    transition: background 150ms var(--ease-out);
+}
+
+.seg-handle:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.seg-handle-left {
+    left: 0;
+    border-radius: 4px 0 0 4px;
+}
+
+.seg-handle-right {
+    right: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.seg-handle::before,
+.seg-handle::after {
+    content: "";
+    width: 1.5px;
+    height: 48%;
+    background: rgba(255, 255, 255, 0.72);
+    border-radius: 1px;
+}
+
+.playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.playhead-head {
+    width: 0;
+    height: 0;
+    margin-left: -7px;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 9px solid var(--accent);
+    filter: drop-shadow(0 1px 4px var(--accent-glow));
+}
+
+.playhead-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 1px;
+    background: color-mix(in oklch, var(--accent) 85%, transparent);
+    box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* ── Filmstrip ───────────────────────────────────────────────────────────── */
+
+.filmstrip {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.filmstrip-frame {
+    flex: none;
+    height: 100%;
+    aspect-ratio: 16 / 9;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.55;
+}
+
+.filmstrip-frame + .filmstrip-frame {
+    border-left: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: overlay-fade 180ms var(--ease-out);
+}
+
+@keyframes overlay-fade {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal {
+    background: var(--bg-modal);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    width: 500px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    box-shadow:
+        0 24px 64px rgba(0, 0, 0, 0.7),
+        0 0 0 1px color-mix(in oklch, var(--text-primary) 5%, transparent) inset;
+    animation: modal-rise 240ms var(--ease-spring);
+}
+
+@keyframes modal-rise {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.025em;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.modal-label {
+    font-size: var(--text-2xs);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+
+.modal-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-input,
+.modal-select {
+    padding: 8px 12px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    font-family: inherit;
+    transition:
+        border-color 150ms var(--ease-out),
+        box-shadow 150ms var(--ease-out),
+        background 150ms var(--ease-out);
+}
+
+.modal-select {
+    cursor: pointer;
+    padding: 7px 12px;
+}
+
+.modal-input:hover,
+.modal-select:hover {
+    border-color: var(--border-strong);
+}
+
+.modal-input:focus,
+.modal-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    background: var(--bg-active);
+}
+
+.modal-path {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.modal-radio-group {
+    display: flex;
+    gap: 18px;
+}
+
+.modal-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.modal-hint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: 3px;
+    display: block;
+    line-height: 1.55;
+}
+
+.modal-hint code {
+    font-family: var(--font-mono);
+    background: var(--bg-deep);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: var(--text-2xs);
+}
+
+.shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 8px;
+}
+
+.shortcuts-table td {
+    padding: 7px 4px;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--text-sm);
+}
+
+.shortcuts-table tr:last-child td {
+    border-bottom: none;
+}
+
+.shortcuts-label {
+    color: var(--text-primary);
+}
+
+.shortcuts-key-cell {
+    text-align: right;
+    width: 1%;
+    white-space: nowrap;
+}
+
+.shortcuts-key-btn {
+    font-family: var(--font-mono);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: var(--text-xs);
+    cursor: pointer;
+    min-width: 84px;
+    letter-spacing: 0.03em;
+    transition:
+        border-color 150ms var(--ease-out),
+        color 150ms var(--ease-out);
+}
+
+.shortcuts-key-btn:hover {
+    border-color: var(--accent);
+}
+
+.shortcuts-key-btn.capturing {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.modal-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 14px 0;
+}
+
+.modal-progress-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+}
+
+.progress-bar-track {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-deep);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+    border-radius: 2px;
+    transition: width 200ms var(--ease-out);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.modal-error {
+    color: var(--accent);
+    font-size: var(--text-xs);
+    background: var(--accent-soft-bg);
+    border: 1px solid var(--accent-soft-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 13px;
+    line-height: 1.5;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+/* ── Settings sliders ────────────────────────────────────────────────────── */
+
+.settings-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.settings-slider-bound {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    min-width: 24px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+.settings-slider {
+    flex: 1;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.crf-marks {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-2xs);
+    color: var(--text-faint);
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
+}
+
+/* ── Range input ─────────────────────────────────────────────────────────── */
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    background: var(--accent);
+    border: 2px solid var(--bg-toolbar);
+    border-radius: 50%;
+    cursor: pointer;
+    transition:
+        transform 130ms var(--ease-spring),
+        box-shadow 130ms var(--ease-out);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+    transform: scale(1.18);
+    box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+    transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-track {
+    height: 6px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border: 2px solid var(--bg-toolbar);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* ── Empty-state onboarding ─────────────────────────────────────────────── */
+
+.onboarding-steps {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+    align-items: center;
+}
+
+.onboarding-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+}
+
+.onboarding-step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid color-mix(in oklch, var(--accent) 35%, var(--border));
+    background: color-mix(in oklch, var(--accent) 10%, var(--bg-deep));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--accent);
+    font-family: var(--font-mono);
+}
+
+.onboarding-step-text {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.45;
+    max-width: 92px;
+    font-weight: 500;
+}
+
+.onboarding-step-text kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--text-secondary);
+    box-shadow: inset 0 -1px 0
+        color-mix(in oklch, var(--bg-deep) 60%, transparent);
+}
+
+.onboarding-step-connector {
+    width: 24px;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--border) 30%,
+        var(--border) 70%,
+        transparent
+    );
+    margin-bottom: 28px;
+    flex-shrink: 0;
+}
+
+/* ── CRF semantic label ─────────────────────────────────────────────────── */
+
+.crf-quality-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    display: inline-block;
+    margin-left: 6px;
+}
+
+/* ── Fast-edit folder row (Settings modal) ───────────────────────────────── */
+
+.fast-edit-root-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.fast-edit-root-path {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 6px 10px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+
+.modal-hint--error {
+    color: var(--danger);
+}
+
+/* ── Accent color swatches (Settings modal) ──────────────────────────────── */
+
+.modal-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 0 4px;
+    border: 0;
+}
+
+.accent-swatches {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.accent-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    padding: 0;
+    cursor: pointer;
+    background: var(--swatch-color);
+    box-shadow:
+        0 0 0 1px var(--border) inset,
+        0 1px 4px color-mix(in oklch, var(--swatch-color) 35%, transparent);
+    transition:
+        transform 120ms var(--ease-spring),
+        box-shadow 160ms var(--ease-out),
+        border-color 160ms var(--ease-out);
+}
+
+.accent-swatch:hover {
+    transform: scale(1.08);
+    box-shadow:
+        0 0 0 1px var(--border-strong) inset,
+        0 2px 10px color-mix(in oklch, var(--swatch-color) 50%, transparent);
+}
+
+.accent-swatch:focus-visible {
+    outline: none;
+    border-color: var(--text-primary);
+}
+
+.accent-swatch.selected {
+    border-color: var(--text-primary);
+    box-shadow:
+        0 0 0 1px var(--bg-modal) inset,
+        0 2px 12px color-mix(in oklch, var(--swatch-color) 55%, transparent);
+}
